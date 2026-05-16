@@ -60,7 +60,7 @@ if not all([MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DB]):
         "MYSQL_HOST=mysql\n"
         "MYSQL_PORT=3306\n"
         "MYSQL_USER=root\n"
-        "MYSQL_PASSWORD=123456\n"
+        "MYSQL_PASSWORD=your_mysql_password\n"
         "MYSQL_DB=door_access_system"
     )
 

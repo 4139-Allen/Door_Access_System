@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 const service = axios.create({
-  baseURL: '/api',      //baseURL: '/api'  → 交给 Nginx 转发(本地开发：'http://127.0.0.1:8000'; docker容器化：'/api')
+  baseURL: 'http://127.0.0.1:8000',      //baseURL: '/api'  → 交给 Nginx 转发(本地开发：'http://127.0.0.1:8000'; docker容器化：'/api')
   timeout: 15000
 })
 
