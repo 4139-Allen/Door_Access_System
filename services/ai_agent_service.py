@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from database.models.user import User
 from database.models.device import Device
 from services.door_service import open_door_service
-from core.config import DEEPSEEK_API_KEY, AI_API_URL, AI_MODEL, AI_TIMEOUT, AI_TEMPERATURE
+from core.config import DEEPSEEK_API_KEY, AI_API_URL, AI_MODEL, AI_TIMEOUT, AI_TEMPERATURE, AI_ENABLED
 from core.ai_system_prompt import get_ai_system_prompt
 from database.redis import redis_client
 from utils.logger import AppLogger
@@ -121,8 +121,8 @@ def build_context_info(context: dict) -> str:
 
 def parse_ai_command(message: str, user_id: int, context: dict = None):
     """解析 AI 命令，支持上下文记忆"""
-    if not DEEPSEEK_API_KEY:
-        return {"type": "text", "msg": "AI 密钥未配置"}
+    if not AI_ENABLED:
+        return {"type": "text", "msg": "AI 功能未启用，请联系管理员配置 API Key"}
 
     # 合并上下文信息
     context_info = build_context_info(context)

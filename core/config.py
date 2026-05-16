@@ -27,12 +27,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "3600
 
 
 # ==================== AI 配置 ====================
+# 注意：AI 功能是可选的，未配置 API Key 不影响系统启动
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
-if not DEEPSEEK_API_KEY:
-    raise ValueError(
-        "未找到 DEEPSEEK_API_KEY 环境变量！\n"
-        "请在 .env 文件中配置 AI API 密钥"
-    )
+AI_ENABLED = bool(DEEPSEEK_API_KEY)  # 根据是否有 API Key 自动判断
+
+if not AI_ENABLED:
+    print("️  警告: 未配置 DEEPSEEK_API_KEY，AI 智能助手功能将不可用")
+    print("   如需使用 AI 功能，请在 .env 文件中配置 DEEPSEEK_API_KEY")
 
 AI_API_URL = os.getenv("AI_API_URL", "https://api.deepseek.com/v1/chat/completions")
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-v4-flash")
