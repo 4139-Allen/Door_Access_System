@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: door-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: door_access_system
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  redis:
+    image: redis:6
+    container_name: door-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: door-api
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+      - redis
+    env_file: .env
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: door-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - fastapi
+
+volumes:
+  mysql-data:
+  redis-data:
