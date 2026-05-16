@@ -175,6 +175,8 @@ ADMIN_PASSWORD=123456
 AUTO_CREATE_ADMIN=true
 
 # ==================== AI 配置 ====================
+# 注意：AI 功能是可选的，未配置此项不影响系统启动
+# 如需使用 AI 智能助手功能，请配置以下参数
 DEEPSEEK_API_KEY=your-deepseek-api-key-here
 AI_API_URL=https://api.deepseek.com/v1/chat/completions
 AI_MODEL=deepseek-v4-flash
