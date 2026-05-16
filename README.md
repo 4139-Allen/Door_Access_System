@@ -553,19 +553,19 @@ door_access_system/
 
 ### 环境变量
 
-| 变量名 | 说明 | 默认值 | 必填 |
-|--------|------|--------|------|
-| SECRET_KEY | JWT 密钥 | - | ✅ |
-| ALGORITHM | JWT 算法 | HS256 | ❌ |
-| ACCESS_TOKEN_EXPIRE_MINUTES | Token 有效期(分钟) | 3600 | ❌ |
-| ADMIN_USERNAME | 默认管理员用户名 | admin | ❌ |
-| ADMIN_PASSWORD | 默认管理员密码 | 123456 | ❌ |
-| AUTO_CREATE_ADMIN | 自动创建管理员 | true | ❌ |
-| MYSQL_HOST | MySQL 主机地址 | - | ✅ |
-| MYSQL_PORT | MySQL 端口 | 3306 | ❌ |
-| MYSQL_USER | MySQL 用户名 | root | ❌ |
-| MYSQL_PASSWORD | MySQL 密码 | - | ✅ |
-| MYSQL_DB | 数据库名称 | - | ✅ |
+| 变量名 | 说明 | 默认值       | 必填 |
+|--------|------|-----------|------|
+| SECRET_KEY | JWT 密钥 | -         | ✅ |
+| ALGORITHM | JWT 算法 | HS256     | ❌ |
+| ACCESS_TOKEN_EXPIRE_MINUTES | Token 有效期(分钟) | 3600      | ❌ |
+| ADMIN_USERNAME | 默认管理员用户名 | admin     | ❌ |
+| ADMIN_PASSWORD | 默认管理员密码 | 123456    | ❌ |
+| AUTO_CREATE_ADMIN | 自动创建管理员 | true      | ❌ |
+| MYSQL_HOST | MySQL 主机地址 | -         | ✅ |
+| MYSQL_PORT | MySQL 端口 | 3306      | ❌ |
+| MYSQL_USER | MySQL 用户名 | root      | ❌ |
+| MYSQL_PASSWORD | MySQL 密码 | -         | ✅ |
+| MYSQL_DB | 数据库名称 | -         | ✅ |
 | REDIS_HOST | Redis 主机地址 | 127.0.0.1 | ❌ |
 | REDIS_PORT | Redis 端口 | 6379      | ❌ |
 | REDIS_DB | Redis 数据库编号 | 0         | ❌ |
