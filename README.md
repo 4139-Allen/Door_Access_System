@@ -14,6 +14,8 @@
 - [技术栈](#技术栈)
 - [系统架构](#系统架构)
 - [快速开始](#快速开始)
+  - [🐳 Docker 部署（强烈推荐）](#-docker-部署强烈推荐)
+  - [💻 手动部署（开发模式）](#-手动部署开发模式)
 - [项目结构](#项目结构)
 - [API 文档](#api-文档)
 - [配置说明](#配置说明)
@@ -133,13 +135,173 @@
 
 ### 前置要求
 
+**推荐使用 Docker 部署（最简单）：**
+- Docker & Docker Compose
+
+**或者手动部署需要：**
 - Python 3.8+
 - MySQL 5.7+ 或 8.0+
 - Redis 6.0+
-- Node.js 16+ & npm (前端开发)
-- Docker & Docker Compose (可选，推荐用于生产环境)
+- Node.js 16+ & npm (仅前端开发时需要)
 
-### 后端安装
+---
+
+### 🐳 Docker 部署（强烈推荐）
+
+使用 Docker Compose 一键部署所有服务（MySQL + Redis + Backend + Frontend），这是最简单、最推荐的部署方式。
+
+#### 1. 克隆项目
+```bash
+git clone <repository-url>
+cd door_access_system
+```
+
+#### 2. 配置环境变量
+复制 `.env.example` 为 `.env` 并修改配置：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，**注意 Docker 环境下数据库和 Redis 的主机名需要使用服务名**：
+```env
+# ==================== JWT 认证配置 ====================
+SECRET_KEY=your-secret-key-here-change-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=3600
+
+# ==================== 管理员初始化配置 ====================
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=123456
+AUTO_CREATE_ADMIN=true
+
+# ==================== AI 配置 ====================
+DEEPSEEK_API_KEY=your-deepseek-api-key-here
+AI_API_URL=https://api.deepseek.com/v1/chat/completions
+AI_MODEL=deepseek-v4-flash
+AI_TIMEOUT=15
+AI_TEMPERATURE=0.1
+
+# ==================== 数据库配置 ====================
+# ⚠️ Docker 环境中必须使用服务名 "mysql"，不能用 "localhost" 或 "127.0.0.1"
+MYSQL_HOST=mysql
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=123456
+MYSQL_DB=door_access_system
+
+# ==================== Redis 配置 ====================
+# ⚠️ Docker 环境中必须使用服务名 "redis"，不能用 "localhost" 或 "127.0.0.1"
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
+
+# ==================== CORS 配置 ====================
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost
+```
+
+**⚠️ 安全提示：**
+- `SECRET_KEY` 应使用强随机字符串
+- 生产环境请修改默认管理员密码
+- 不要将 `.env` 文件提交到版本控制系统
+
+#### 3. 构建前端（重要！）
+
+在启动 Docker 之前，需要先构建前端项目：
+
+```bash
+# 进入前端目录
+cd frontend
+
+# 安装依赖
+npm install
+
+# 构建生产版本
+npm run build
+
+# 返回项目根目录
+cd ..
+```
+
+这会在 `frontend/dist` 目录生成静态文件，Docker 会将其复制到 Nginx 容器中。
+
+#### 4. 启动所有服务
+```bash
+docker-compose up -d
+```
+
+首次启动会自动：
+- ✅ 创建 MySQL 数据库和表结构
+- ✅ 启动 Redis 缓存服务
+- ✅ 启动后端 FastAPI 服务
+- ✅ 构建并启动前端 Vue 应用
+- ✅ 创建默认管理员账户（用户名: `admin`, 密码: `123456`）
+- ⚠️ **请在首次登录后立即修改密码！**
+
+#### 5. 查看服务状态
+```bash
+docker-compose ps
+```
+
+#### 6. 查看日志
+```bash
+# 查看所有服务日志
+docker-compose logs -f
+
+# 查看特定服务日志
+docker-compose logs -f fastapi
+docker-compose logs -f frontend
+docker-compose logs -f mysql
+```
+
+#### 6. 停止服务
+```bash
+docker-compose down
+```
+
+**💡 重要提示：**
+- 如果你修改了前端代码，需要重新构建前端并重启容器：
+  ```bash
+  cd frontend && npm run build && cd ..
+  docker-compose up -d --build frontend
+  ```
+- 如果只修改了后端代码，只需重启后端容器：
+  ```bash
+  docker-compose up -d --build fastapi
+  ```
+
+**💡 重要提示：**
+- 如果你修改了前端代码，需要重新构建前端并重启容器：
+  ```bash
+  cd frontend && npm run build && cd ..
+  docker-compose up -d --build frontend
+  ```
+- 如果只修改了后端代码，只需重启后端容器：
+  ```bash
+  docker-compose up -d --build fastapi
+  ```
+
+**服务访问地址：**
+- 🌐 前端界面：http://localhost:80
+- 🔌 后端 API：http://localhost:8000
+- 📚 API 文档：http://localhost:8000/docs
+- 💚 健康检查：http://localhost:8000/health
+- 🗄️ MySQL：localhost:3307（外部访问端口）
+- 📦 Redis：localhost:6379（外部访问端口）
+
+**Docker 部署优势：**
+- ✅ 一键部署，无需手动安装 MySQL、Redis、Python、Node.js
+- ✅ 环境隔离，避免依赖冲突
+- ✅ 前后端统一管理，简化运维
+- ✅ 易于扩展和维护
+- ✅ 生产环境推荐方案
+
+---
+
+### 💻 手动部署（开发模式）
+
+如果你需要本地开发或调试，可以选择手动部署各个组件。
+
+#### 后端安装
 
 #### 1. 克隆项目
 ```bash
@@ -164,7 +326,12 @@ pip install -r requirements.txt
 ```
 
 #### 4. 配置环境变量
-创建 `.env` 文件（参考 `.env.example`）：
+复制 `.env.example` 为 `.env` 并修改配置：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填写你的实际配置（**本地开发环境**）：
 ```env
 # ==================== JWT 认证配置 ====================
 SECRET_KEY=your-secret-key-here
@@ -184,6 +351,7 @@ AI_TIMEOUT=15
 AI_TEMPERATURE=0.1
 
 # ==================== 数据库配置 ====================
+# 本地开发使用 localhost 或 127.0.0.1
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=root
@@ -191,6 +359,7 @@ MYSQL_PASSWORD=your-password
 MYSQL_DB=door_access_system
 
 # ==================== Redis 配置 ====================
+# 本地开发使用 127.0.0.1
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_DB=0
@@ -235,63 +404,6 @@ python main.py
 健康检查：http://127.0.0.1:8000/health
 
 ---
-
-### 🐳 Docker 部署（推荐）
-
-使用 Docker Compose 一键部署所有服务（MySQL + Redis + Backend + Frontend）：
-
-#### 1. 确保已安装 Docker 和 Docker Compose
-
-#### 2. 配置环境变量
-编辑 `.env` 文件，确保数据库配置与 docker-compose.yml 一致：
-```env
-MYSQL_HOST=mysql          # Docker 网络中使用服务名
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=123456
-MYSQL_DB=door_access_system
-
-REDIS_HOST=redis          # Docker 网络中使用服务名
-REDIS_PORT=6379
-```
-
-#### 3. 启动所有服务
-```bash
-docker-compose up -d
-```
-
-#### 4. 查看服务状态
-```bash
-docker-compose ps
-```
-
-#### 5. 查看日志
-```bash
-# 查看所有服务日志
-docker-compose logs -f
-
-# 查看特定服务日志
-docker-compose logs -f fastapi
-docker-compose logs -f frontend
-```
-
-#### 6. 停止服务
-```bash
-docker-compose down
-```
-
-**服务访问地址：**
-- 前端界面：http://localhost:80
-- 后端 API：http://localhost:8000
-- API 文档：http://localhost:8000/docs
-- MySQL：localhost:3307（外部访问）
-- Redis：localhost:6379（外部访问）
-
-**优势：**
-- ✅ 一键部署，无需手动安装 MySQL、Redis
-- ✅ 环境隔离，避免依赖冲突
-- ✅ 易于扩展和维护
-- ✅ 生产环境推荐方案
 
 ### 前端安装
 
@@ -489,7 +601,21 @@ door_access_system/
 
 ## ❓ 常见问题
 
-### 1. Redis 连接失败
+### 1. 应该选择 Docker 部署还是手动部署？
+
+**推荐 Docker 部署，如果：**
+- ✅ 你想要快速部署和运行系统
+- ✅ 你不想手动安装 MySQL、Redis 等依赖
+- ✅ 你需要在生产环境中部署
+- ✅ 你希望环境隔离，避免依赖冲突
+
+**选择手动部署，如果：**
+- 💻 你需要进行本地开发和调试
+- 🔧 你需要修改后端代码并实时测试
+- 🐛 你需要调试具体的问题
+- 📚 你想深入了解系统的每个组件
+
+### 2. Redis 连接失败
 **问题**: `Redis 未启动，将继续运行但无法退出登录`
 
 **解决**: 
@@ -500,7 +626,7 @@ redis-server
 sudo systemctl start redis
 ```
 
-### 2. 数据库连接失败
+### 3. 数据库连接失败
 **问题**: `Can't connect to MySQL server`
 
 **解决**:
@@ -508,7 +634,7 @@ sudo systemctl start redis
 - 确认 `.env` 中的数据库配置正确
 - 确保数据库 `door_access_system` 已创建
 
-### 3. bcrypt 兼容性问题
+### 4. bcrypt 兼容性问题
 **问题**: `AttributeError: module 'bcrypt' has no attribute '__about__'`
 
 **解决**:
@@ -516,20 +642,20 @@ sudo systemctl start redis
 pip install bcrypt==4.0.1
 ```
 
-### 4. 密码长度限制
+### 5. 密码长度限制
 **问题**: `密码过长`
 
 **说明**: bcrypt 限制密码最多 72 字节，已在代码中处理。
 
-### 5. CORS 跨域问题
+### 6. CORS 跨域问题
 **解决**: 后端已配置 CORS，可通过 `ALLOWED_ORIGINS` 环境变量配置允许的域名。
 
-### 6. 重复日志问题
+### 7. 重复日志问题
 **问题**: 开发模式下日志重复输出
 
 **解决**: 已使用 FastAPI lifespan 机制优化，确保初始化代码只执行一次。
 
-### 7. 如何重置数据库
+### 8. 如何重置数据库
 ```python
 # 在 main.py 中临时启用
 Base.metadata.drop_all(bind=engine)  # 删除所有表
@@ -543,7 +669,7 @@ python -c "from database.db import Base, engine; Base.metadata.drop_all(engine)"
 
 ⚠️ **警告**: 这会删除所有数据，请谨慎操作！
 
-### 8. Docker 部署注意事项
+### 9. Docker 部署注意事项
 
 **问题**: 容器内无法连接数据库或 Redis
 
@@ -555,7 +681,7 @@ python -c "from database.db import Base, engine; Base.metadata.drop_all(engine)"
   ```
 - 确保 docker-compose.yml 中的服务名称与配置一致
 
-### 9. WebSocket 连接失败
+### 10. WebSocket 连接失败
 
 **问题**: WebSocket 连接被拒绝
 
@@ -564,7 +690,7 @@ python -c "from database.db import Base, engine; Base.metadata.drop_all(engine)"
 - 检查防火墙设置，确保 8000 端口开放
 - 前端使用正确的 WebSocket URL：`ws://127.0.0.1:8000/ws/{user_id}`
 
-### 10. 前端跨域问题
+### 11. 前端跨域问题
 
 **问题**: 前端请求后端 API 出现 CORS 错误
 

@@ -1,4 +1,4 @@
-NEW_FILE_CODE
+
 # Python
 __pycache__/
 *.py[cod]
@@ -29,3 +29,50 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# 测试和覆盖率
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# Node modules (for frontend)
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+
+# Frontend logs
+frontend/logs/
+frontend/*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
