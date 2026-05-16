@@ -68,6 +68,7 @@
 ### 系统优化
 - ✅ **应用生命周期管理**（FastAPI lifespan）
 - ✅ **自动管理员初始化**（启动时自动创建默认管理员）
+- ✅ **自动数据库初始化**（自动建库 + 建表，无需手动操作）
 - ✅ **日志优化**（结构化日志输出，减少冗余）
 - ✅ **健康检查接口**（`/health` 端点）
 - ✅ **SQLAlchemy 日志优化**（生产环境关闭 SQL 调试日志）
@@ -197,8 +198,10 @@ REDIS_HOST=redis
 REDIS_PORT=6379
 REDIS_DB=0
 
-# ==================== CORS 配置 ====================
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost
+# ==================== CORS 跨域配置 ====================
+# * 表示允许所有来源访问（开发/测试环境推荐）
+# 生产环境建议指定具体域名，如：http://your-domain.com
+ALLOWED_ORIGINS=*
 ```
 
 **⚠️ 安全提示：**
@@ -255,21 +258,10 @@ docker-compose logs -f frontend
 docker-compose logs -f mysql
 ```
 
-#### 6. 停止服务
-```bash
+#### 4. 停止服务
+```
 docker-compose down
 ```
-
-**💡 重要提示：**
-- 如果你修改了前端代码，需要重新构建前端并重启容器：
-  ```bash
-  cd frontend && npm run build && cd ..
-  docker-compose up -d --build frontend
-  ```
-- 如果只修改了后端代码，只需重启后端容器：
-  ```bash
-  docker-compose up -d --build fastapi
-  ```
 
 **💡 重要提示：**
 - 如果你修改了前端代码，需要重新构建前端并重启容器：
@@ -366,8 +358,10 @@ REDIS_HOST=127.0.0.1
 REDIS_PORT=6379
 REDIS_DB=0
 
-# ==================== CORS 配置 ====================
-ALLOWED_ORIGINS=http://localhost:5173
+# ==================== CORS 跨域配置 ====================
+# * 表示允许所有来源访问（方便多设备访问）
+# 生产环境建议指定具体域名以提高安全性
+ALLOWED_ORIGINS=*
 ```
 
 **⚠️ 安全提示：**
@@ -393,7 +387,8 @@ python main.py
 ```
 
 **首次启动会自动：**
-- ✅ 创建数据库表（如果不存在）
+- ✅ 自动创建 MySQL 数据库（如果不存在）
+- ✅ 自动创建所有数据表
 - ✅ 创建默认管理员账户（用户名: `admin`, 密码: `123456`）
 - ⚠️ **请在首次登录后立即修改密码！**
 
@@ -575,7 +570,7 @@ door_access_system/
 | REDIS_PORT | Redis 端口 | 6379 | ❌ |
 | REDIS_DB | Redis 数据库编号 | 0 | ❌ |
 | REDIS_PASSWORD | Redis 密码 | 无 | ❌ |
-| DEEPSEEK_API_KEY | DeepSeek API Key | - | ✅ |
+| DEEPSEEK_API_KEY | DeepSeek API Key | 无（可选） | ❌ |
 | ALLOWED_ORIGINS | CORS 允许来源 | http://localhost:5173 | ❌ |
 
 ### Redis 缓存策略
@@ -629,7 +624,7 @@ sudo systemctl start redis
 **解决**:
 - 检查 MySQL 服务是否启动
 - 确认 `.env` 中的数据库配置正确
-- 确保数据库 `door_access_system` 已创建
+- **注意**：项目启动时会自动创建数据库，无需手动执行 `CREATE DATABASE`
 
 ### 4. bcrypt 兼容性问题
 **问题**: `AttributeError: module 'bcrypt' has no attribute '__about__'`
@@ -653,18 +648,20 @@ pip install bcrypt==4.0.1
 **解决**: 已使用 FastAPI lifespan 机制优化，确保初始化代码只执行一次。
 
 ### 8. 如何重置数据库
-```python
-# 在 main.py 中临时启用
-Base.metadata.drop_all(bind=engine)  # 删除所有表
-Base.metadata.create_all(bind=engine)  # 重新创建
+
+**方法 1**: 在 `main.py` 的 `lifespan` 中临时启用
+```
+# 在 main.py 的 lifespan 函数中取消注释
+drop_all_tables()  # 删除所有表
+init_database()    # 重新创建表和初始化管理员
 ```
 
-**方法 2**: 使用独立脚本
+**方法 2**: 使用 Python 命令
 ```bash
 python -c "from database.db import Base, engine; Base.metadata.drop_all(engine)"
 ```
 
-⚠️ **警告**: 这会删除所有数据，请谨慎操作！
+⚠️ **警告**: 这会删除所有数据，请谨慎操作！重启后会自动重建空表和管理员账户。
 
 ### 9. Docker 部署注意事项
 
@@ -692,8 +689,9 @@ python -c "from database.db import Base, engine; Base.metadata.drop_all(engine)"
 **问题**: 前端请求后端 API 出现 CORS 错误
 
 **解决**: 
-- 检查 `.env` 中的 `ALLOWED_ORIGINS` 是否包含前端地址
-- 多个地址用逗号分隔：`http://localhost:5173,http://localhost:80`
+- 默认配置已允许所有来源访问（`ALLOWED_ORIGINS=*`）
+- 如需限制特定域名，修改 `.env` 中的 `ALLOWED_ORIGINS`
+- 多个地址用逗号分隔：`http://localhost:5173,http://192.168.1.100`
 - 重启后端服务使配置生效
 
 ## 📝 开发规范
@@ -739,7 +737,7 @@ perf: 性能优化
 - [ ] 修改默认管理员密码
 - [ ] 使用强随机 `SECRET_KEY`（至少32字符）
 - [ ] 配置 HTTPS（使用 Nginx 反向代理）
-- [ ] 限制 CORS 允许的域名
+- [ ] 生产环境建议限制 CORS 允许的域名（不要使用 `*`）
 - [ ] 启用 Redis 密码认证
 - [ ] 定期备份数据库
 - [ ] 配置日志轮转和监控
@@ -811,4 +809,4 @@ curl http://127.0.0.1:8000/health
 
 ---
 
-**最后更新**: 2026-05-15
+**最后更新**: 2026-05-16
