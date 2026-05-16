@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import routers
 from core.config import ALLOWED_ORIGINS
-from database.db import engine, Base
+from database.db import engine, Base, init_database
 from fastapi import Request
 from utils.response import error
 # 导入封装好的日志类
@@ -14,17 +14,25 @@ import time
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # ===== 启动时执行 =====
-    app_logger = AppLogger.get_logger() # 创建日志对象
+    app_logger = AppLogger.get_logger()
     app_logger.info("=" * 50)
     app_logger.info("🚀 门禁管理系统正在启动...")
     app_logger.info("=" * 50)
 
-    # 初始化管理员账户
+    # 1. 初始化数据库（建库 + 建表）
+    try:
+        # 如需重置数据库，取消下一行注释并重启（⚠️ 会清空所有数据）
+        # drop_all_tables()
+        init_database()
+    except Exception as e:
+        app_logger.error(f"⚠️ 数据库初始化失败，服务将无法正常运行: {e}")
+
+    # 2. 初始化管理员账户
     try:
         from database.admin import init_admin
         init_admin()
     except Exception as e:
-        app_logger.error(f"⚠️  管理员初始化失败: {e}")
+        app_logger.error(f"⚠️ 管理员初始化失败: {e}")
 
     app_logger.info("=" * 50)
     app_logger.info("✅ 门禁管理系统服务启动成功 🚀")
@@ -40,11 +48,8 @@ async def lifespan(app: FastAPI):
     app_logger.info("=" * 50)
 
 
+
 app = FastAPI(title="门禁管理系统", version="1.0", lifespan=lifespan)  #  传入 lifespan
-
-
-# 数据库初始化(没有表创建所有表)
-Base.metadata.create_all(bind=engine)
 
 # # 删除所有表
 # Base.metadata.drop_all(bind=engine)

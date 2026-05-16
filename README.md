@@ -375,12 +375,7 @@ ALLOWED_ORIGINS=http://localhost:5173
 - 生产环境请修改默认管理员密码
 - 不要将 `.env` 文件提交到版本控制系统
 
-#### 5. 创建数据库
-```sql
-CREATE DATABASE door_access_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
-#### 6. 启动 Redis
+#### 5. 启动 Redis
 ```bash
 # Windows
 redis-server
@@ -392,7 +387,7 @@ sudo systemctl start redis
 brew services start redis
 ```
 
-#### 7. 运行后端服务
+#### 6. 运行后端服务
 ```bash
 python main.py
 ```
