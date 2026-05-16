@@ -567,11 +567,11 @@ door_access_system/
 | MYSQL_PASSWORD | MySQL 密码 | - | ✅ |
 | MYSQL_DB | 数据库名称 | - | ✅ |
 | REDIS_HOST | Redis 主机地址 | 127.0.0.1 | ❌ |
-| REDIS_PORT | Redis 端口 | 6379 | ❌ |
-| REDIS_DB | Redis 数据库编号 | 0 | ❌ |
-| REDIS_PASSWORD | Redis 密码 | 无 | ❌ |
-| DEEPSEEK_API_KEY | DeepSeek API Key | 无（可选） | ❌ |
-| ALLOWED_ORIGINS | CORS 允许来源 | http://localhost:5173 | ❌ |
+| REDIS_PORT | Redis 端口 | 6379      | ❌ |
+| REDIS_DB | Redis 数据库编号 | 0         | ❌ |
+| REDIS_PASSWORD | Redis 密码 | 无         | ❌ |
+| DEEPSEEK_API_KEY | DeepSeek API Key | 无（可选）     | ❌ |
+| ALLOWED_ORIGINS | CORS 允许来源 | *         | ❌ |
 
 ### Redis 缓存策略
 
