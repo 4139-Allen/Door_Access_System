@@ -9,7 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: door_access_system
     ports:
-      - "3307:3306"
+      - "3307:3306"   #本机端口:容器端口(腾出3306给容器使用)
     volumes:
       - mysql-data:/var/lib/mysql
 
