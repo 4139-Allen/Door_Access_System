@@ -10,7 +10,9 @@ from services.device_service import (
     delete_device,
     bind_user_device,
     unbind_user_device,
-    get_device_list
+    get_device_list,
+    DEVICE_CACHE_KEY_TEMPLATE,
+    CACHE_EXPIRE
 )
 from database.models.user import User
 from database.redis import redis_client
@@ -18,10 +20,6 @@ import json
 from typing import Optional
 
 router = APIRouter(tags=["【管理员】设备管理"])
-
-# 缓存配置
-DEVICE_CACHE_KEY_TEMPLATE = "cache:device:list:user:{user_id}"
-CACHE_EXPIRE = 60
 
 
 # 创建设备

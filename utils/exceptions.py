@@ -3,12 +3,11 @@
 用于统一 Service 层的异常处理和日志记录
 """
 import functools
-import logging
 from typing import Callable, Any
 from sqlalchemy.orm import Session
+from utils.logger import AppLogger
 
-# 配置日志
-logger = logging.getLogger(__name__)
+logger = AppLogger.get_logger()
 
 
 def service_exception_handler(func: Callable) -> Callable:

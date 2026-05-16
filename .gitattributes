@@ -1,0 +1,39 @@
+# 自动检测文本文件
+* text=auto
+
+# Python 文件
+*.py text eol=lf
+
+# Shell 脚本
+*.sh text eol=lf
+
+# Windows 批处理
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 配置文件
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# 文档
+*.md text eol=lf
+*.txt text eol=lf
+
+# 前端文件
+*.js text eol=lf
+*.vue text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+
+# 二进制文件（强制 binary）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

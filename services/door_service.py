@@ -134,8 +134,6 @@ def query_logs(
 
     if conditions:
         query = query.filter(and_(*conditions))
-    # Deleted:if conditions:
-    # Deleted:query = query.filter(and_(*conditions))
 
     # 按时间倒序排列（最新的在前）
     query = query.order_by(DoorLog.time.desc())

@@ -2,11 +2,18 @@
 
 一个基于 FastAPI + Vue 3 的智能化门禁管理系统，支持多设备管理、用户权限控制、开门记录查询和 AI 智能开门功能。
 
-![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)
-![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen.svg)
+![Python](https://img.shields.io/badge/Python-3.11+-blue.svg?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg?logo=fastapi)
+![Vue](https://img.shields.io/badge/Vue-3.5-brightgreen.svg?logo=vue.js&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
-![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)
+![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg?logo=docker&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-orange.svg?logo=mysql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-6.0-red.svg?logo=redis&logoColor=white)
+![GitHub Stars](https://img.shields.io/github/stars/4139-Allen/Door_Access_System?style=social)
+![GitHub Issues](https://img.shields.io/github/issues/4139-Allen/Door_Access_System)
+![Last Commit](https://img.shields.io/github/last-commit/4139-Allen/Door_Access_System)
+![Version](https://img.shields.io/badge/version-1.0.0-purple.svg)
+
 
 ## 📋 目录
 
@@ -315,6 +322,8 @@ ALLOWED_ORIGINS=*
 
 #### 3. 构建前端（重要！）
 
+> ⚠️ **重要提醒**：启动 Docker 前必须先构建前端，否则前端容器将无法启动！
+
 在启动 Docker 之前，需要先构建前端项目：
 
 ```bash
@@ -362,7 +371,32 @@ docker-compose logs -f frontend
 docker-compose logs -f mysql
 ```
 
-#### 4. 停止服务
+#### 7. 验证部署成功 ✅
+
+部署完成后，访问以下地址验证系统是否正常运行：
+
+| 服务 | 访问地址 | 预期结果 |
+|------|---------|----------|
+| 🌐 **前端界面** | http://localhost | 看到登录页面 |
+| 🔌 **后端 API** | http://localhost:8000 | 返回 `{"detail":"Not Found"}`（正常） |
+| 📚 **API 文档** | http://localhost:8000/docs | 看到 Swagger UI 界面 |
+| 💚 **健康检查** | http://localhost:8000/health | 返回 `{"status": "healthy", "service": "door_access_system"}` |
+
+**默认管理员账号：**
+- 👤 用户名：`admin`
+- 🔑 密码：`123456`
+- ⚠️ **请在首次登录后立即修改密码！**
+
+**快速测试：**
+```bash
+# 测试健康检查接口
+curl http://localhost:8000/health
+
+# 预期输出：
+# {"status": "healthy", "service": "door_access_system"}
+```
+
+#### 8. 停止服务
 ```
 docker-compose down
 ```
@@ -890,9 +924,11 @@ curl http://127.0.0.1:8000/health
 
 本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
+你可以自由地使用、修改和分发本软件，包括商业用途。
+
 ## 👥 作者
 
-- ALLen
+- Allen
 
 ## 🙏 致谢
 
@@ -903,14 +939,23 @@ curl http://127.0.0.1:8000/health
 
 ---
 
+---
+
 ⭐ 如果这个项目对你有帮助，请给个 Star 支持一下！
 
 ## 📞 联系方式
 
 如有问题或建议，欢迎通过以下方式联系：
-- 提交 [Issue](https://github.com/your-repo/door_access_system/issues)
-- 发送邮件至：your-email@example.com
+- 提交 [Issue](https://github.com/4139-Allen/Door_Access_System/issues)
+- 发送邮件至：laichangjian894@gmail.com
 
 ---
 
-**最后更新**: 2026-05-16
+**最后更新**: 2026-05-16 | **版本**: v1.0.0 | **许可证**: MIT
+
+![GitHub repo size](https://img.shields.io/github/repo-size/4139-Allen/Door_Access_System?label=Repo%20Size)
+![GitHub code size](https://img.shields.io/github/languages/code-size/4139-Allen/Door_Access_System?label=Code%20Size)
+![GitHub language count](https://img.shields.io/github/languages/count/4139-Allen/Door_Access_System?label=Languages)
+![GitHub top language](https://img.shields.io/github/languages/top/4139-Allen/Door_Access_System?color=blue)
+
+

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import routers
 from core.config import ALLOWED_ORIGINS
-from database.db import engine, Base, init_database
+from database.db import init_database
 from fastapi import Request
 from utils.response import error
 # 导入封装好的日志类

@@ -1,9 +1,9 @@
 from pydantic import BaseModel
 from typing import Any, Optional
 from functools import wraps
-import logging
+from utils.logger import AppLogger
 
-logger = logging.getLogger(__name__)
+logger = AppLogger.get_logger()
 
 
 # 统一返回模型 → 让接口文档正常显示
