@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
     # 2. 初始化管理员账户
     try:
-        from database.admin import init_admin
+        from services.user_service import init_admin
         init_admin()
     except Exception as e:
         app_logger.error(f"⚠️ 管理员初始化失败: {e}")

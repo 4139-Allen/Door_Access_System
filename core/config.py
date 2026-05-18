@@ -32,6 +32,7 @@ AI_API_URL = os.getenv("AI_API_URL", "https://api.deepseek.com/v1/chat/completio
 AI_MODEL = os.getenv("AI_MODEL", "deepseek-v4-flash")
 AI_TIMEOUT = int(os.getenv("AI_TIMEOUT", "15"))
 AI_TEMPERATURE = float(os.getenv("AI_TEMPERATURE", "0.1"))
+AI_ENABLED = bool(DEEPSEEK_API_KEY) and DEEPSEEK_API_KEY.strip() != ""
 
 if not DEEPSEEK_API_KEY:
     logging.warning("⚠️  未配置 DEEPSEEK_API_KEY，AI 智能助手功能将不可用")

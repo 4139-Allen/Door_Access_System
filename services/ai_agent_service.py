@@ -144,6 +144,12 @@ def parse_ai_command(message: str, user_id: int, context: dict = None):
 
     try:
         response = requests.post(AI_API_URL, headers=headers, json=data, timeout=AI_TIMEOUT)
+
+        # 检查 HTTP 状态码，区分认证错误和其他错误
+        if response.status_code == 401 or response.status_code == 403:
+            logger.error(f"AI API 认证失败 (HTTP {response.status_code})，请检查 API Key 是否正确")
+            return {"type": "text", "msg": "AI API Key 无效或已过期，请联系管理员检查配置"}
+
         response.raise_for_status()
         ai_raw = response.json()["choices"][0]["message"]["content"].strip()
 
@@ -169,6 +175,17 @@ def parse_ai_command(message: str, user_id: int, context: dict = None):
 
     except requests.exceptions.Timeout:
         return {"type": "text", "msg": "AI服务超时,请稍后再试"}
+    except requests.exceptions.HTTPError as e:
+        status_code = e.response.status_code if e.response is not None else 0
+        logger.error(f"AI HTTP 错误 (状态码: {status_code}): {e}")
+        if status_code in [401, 403]:
+            return {"type": "text", "msg": "AI API Key 无效或已过期，请联系管理员检查配置"}
+        elif status_code == 429:
+            return {"type": "text", "msg": "AI 服务请求过于频繁，请稍后再试"}
+        elif status_code >= 500:
+            return {"type": "text", "msg": "AI 服务器内部错误，请稍后再试"}
+        else:
+            return {"type": "text", "msg": f"AI 服务请求失败 (HTTP {status_code})"}
     except requests.exceptions.RequestException as e:
         logger.error(f"AI请求失败: {e}")
         return {"type": "text", "msg": "AI服务暂时异常"}
