@@ -6,9 +6,10 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from services.device_service import check_user_permission
-from utils.exceptions import service_exception_handler
+from utils.service_exception import service_exception_handler
 from schemas.door_schema import LogQuery
 from utils.logger import AppLogger
+from core.exceptions import NotFoundError
 
 logger = AppLogger.get_logger()
 
@@ -22,18 +23,24 @@ def open_door_service(db: Session, user_id: int, device_id: int, user_role: str)
     开门核心逻辑，返回 (success: bool, message: str)
     可被 API 和 AI Agent 复用
     """
-    # 获取用户和设备信息用于日志
+    # 1. 查询用户
     user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundError("用户不存在")  # 404
+
+    # 2. 查询设备
     device = db.query(Device).filter(Device.id == device_id).first()
-    
-    username = user.username if user else f"用户ID:{user_id}"
-    device_name = device.name if device else f"设备ID:{device_id}"
-    
-    # 管理员：允许开所有设备
+    if not device:
+        logger.warning(f"🚫 开门失败 | 设备ID: {device_id} | 原因: 设备不存在")
+        raise NotFoundError("设备不存在")
+
+    username = user.username
+    device_name = device.name
+
+    # 3. 权限判断
     if user_role != "admin":
-        # 普通用户：必须存在绑定关系
         if not check_user_permission(db, user_id, device_id):
-            # 写入无权限失败日志
+            # 记录日志
             log = DoorLog(
                 user_id=user_id,
                 device_id=device_id,
@@ -43,10 +50,11 @@ def open_door_service(db: Session, user_id: int, device_id: int, user_role: str)
             )
             db.add(log)
             db.commit()
-            logger.warning(f"🚫 开门失败 | 设备: {device_name} | 用户: {username} | 原因: 无权限")
-            return False, "无权限操作：你未绑定该设备，无法开门"
 
-    # 有权限则正常开门
+            logger.warning(f"🚫 开门失败 | 设备: {device_name} | 用户: {username} | 原因: 无权限")
+            raise PermissionError("无权限操作：你未绑定该设备，无法开门")  # 403
+
+    # 4. 开门成功
     log = DoorLog(
         user_id=user_id,
         device_id=device_id,
@@ -56,6 +64,7 @@ def open_door_service(db: Session, user_id: int, device_id: int, user_role: str)
     )
     db.add(log)
     db.commit()
+
     logger.info(f"🚪 开门成功 | 设备: {device_name} | 用户: {username} | 用户ID: {user_id}")
     return True, "开门成功"
 

@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 
 from core.config import AUTO_CREATE_ADMIN, ADMIN_USERNAME, ADMIN_PASSWORD
+from core.exceptions import NotFoundError
+from utils.service_exception import service_exception_handler
 from database.db import SessionLocal
 from database.models.user import User
 from database.models.door_log import DoorLog
@@ -83,7 +85,7 @@ def db_create_user(db: Session, username: str, password: str, role: str = "user"
         logger.error(f"❌ 创建用户失败 | 用户名: {username} | 错误: {str(e)}")
         raise Exception(f"创建用户失败: {str(e)}")
 
-
+@service_exception_handler
 def delete_user_by_id(db: Session, user_id: int) -> bool:
     """
     删除用户及其关联数据
@@ -94,37 +96,27 @@ def delete_user_by_id(db: Session, user_id: int) -> bool:
 
     返回:
         bool: 是否删除成功
-
-    异常:
-        ValueError: 用户不存在
-        Exception: 删除失败
     """
-    try:
-        # 先检查用户是否存在
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            logger.warning(f"⚠️  删除用户失败 | 用户ID: {user_id} | 原因: 用户不存在")
-            raise ValueError("用户不存在")
+    # 先检查用户是否存在
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        logger.warning(f"⚠️  删除用户失败 | 用户ID: {user_id} | 原因: 用户不存在")
+        raise NotFoundError("用户不存在")  # ✅ 这里改成 404
 
-        username = user.username
-        
-        # 删除关联的门禁日志
-        db.query(DoorLog).filter(DoorLog.user_id == user_id).delete()
+    username = user.username
 
-        # 删除关联的设备绑定
-        db.query(UserDevice).filter(UserDevice.user_id == user_id).delete()
+    # 删除关联的门禁日志
+    db.query(DoorLog).filter(DoorLog.user_id == user_id).delete()
 
-        # 删除用户
-        db.delete(user)
-        db.commit()
-        logger.info(f"🗑️  删除用户成功 | 用户名: {username} | 用户ID: {user_id}")
-        return True
-    except ValueError:
-        raise
-    except Exception as e:
-        db.rollback()
-        logger.error(f"❌ 删除用户失败 | 用户ID: {user_id} | 错误: {str(e)}")
-        raise Exception(f"删除用户失败: {str(e)}")
+    # 删除关联的设备绑定
+    db.query(UserDevice).filter(UserDevice.user_id == user_id).delete()
+
+    # 删除用户
+    db.delete(user)
+    db.commit()
+
+    logger.info(f"🗑️  删除用户成功 | 用户名: {username} | 用户ID: {user_id}")
+    return True
 
 
 def get_users_list(db: Session, page: int, size: int, username: Optional[str] = None, role: Optional[str] = None) -> \
@@ -191,6 +183,11 @@ def change_user_password(db: Session, user: User, old_password: str, new_passwor
     if not verify_password(old_password, user.password):
         logger.warning(f"❌ 修改密码失败 | 用户: {user.username} | 原因: 原密码错误")
         raise ValueError("原密码错误")
+
+    #密码较短
+    if len(new_password) < 6:
+        logger.warning(f"❌ 修改密码失败 | 用户: {user.username} | 原因: 密码长度不足6位")
+        raise ValueError("密码长度不能小于6位")
 
     # 检查新密码长度（bcrypt限制）
     if len(new_password.encode('utf-8')) > 72:

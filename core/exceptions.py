@@ -1,0 +1,14 @@
+"""全局异常(自定义)"""
+
+
+class NotFoundError(Exception):
+    """资源不存在"""
+    pass
+
+class AuthError(Exception):
+    """认证失败"""
+    pass
+
+class BusinessError(Exception):
+    """业务错误"""
+    pass

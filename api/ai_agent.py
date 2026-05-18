@@ -5,7 +5,8 @@ from database.db import get_db
 from utils.auth import get_current_user_obj
 from database.models.user import User
 from services.ai_agent_service import process_ai_chat_command
-from utils.response import success, handle_api_exception
+from core.api_exception_handler import handle_api_exception
+from core.response_schema import success
 
 router = APIRouter(prefix="/ai", tags=["🤖 AI指令开门"])
 

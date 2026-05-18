@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, Path, Body, Query
 from sqlalchemy.orm import Session
 from database.db import get_db
 from utils.auth import get_current_user_obj, require_admin
-from utils.response import error, success, handle_api_exception
+from core.api_exception_handler import handle_api_exception
+from core.response_schema import success, error
 from schemas.device_schema import DeviceCreate, DeviceUpdate, BindUserDevice
 from services.device_service import (
     create_device,

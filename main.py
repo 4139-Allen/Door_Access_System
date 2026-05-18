@@ -4,7 +4,7 @@ from api.routers import routers
 from core.config import ALLOWED_ORIGINS
 from database.db import init_database
 from fastapi import Request
-from utils.response import error
+from core.api_exception_handler import error
 # 导入封装好的日志类
 from utils.logger import AppLogger
 from contextlib import asynccontextmanager
@@ -91,7 +91,7 @@ async def log_requests(request: Request, call_next):
     return response
 
 # 路由
-app.include_router(routers)
+app.include_router(routers, prefix="/api")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):

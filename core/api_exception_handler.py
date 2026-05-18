@@ -1,52 +1,12 @@
-from pydantic import BaseModel
-from typing import Any, Optional
+"""
+ API异常
+"""
 from functools import wraps
 from utils.logger import AppLogger
+from core.response_schema import error
+from core.exceptions import NotFoundError, AuthError
 
 logger = AppLogger.get_logger()
-
-
-# 统一返回模型 → 让接口文档正常显示
-class ApiResponse(BaseModel):
-    code: int
-    msg: str
-    data: Optional[Any] = None
-
-
-def success(data=None, msg="操作成功"):
-    """
-    成功响应
-
-    参数:
-        data: 响应数据
-        msg: 成功消息
-
-    返回:
-        dict: 统一格式的响应
-    """
-    return {
-        "code": 200,
-        "msg": msg,
-        "data": data
-    }
-
-
-def error(msg="操作失败", code=400):
-    """
-    错误响应
-
-    参数:
-        msg: 错误消息
-        code: 错误码
-
-    返回:
-        dict: 统一格式的响应
-    """
-    return {
-        "code": code,
-        "msg": msg,
-        "data": None
-    }
 
 
 def handle_api_exception(func):
@@ -73,9 +33,12 @@ def handle_api_exception(func):
         except PermissionError as e:
             logger.warning(f"权限错误 [{func.__name__}]: {str(e)}")
             return error(str(e), code=403)
-        except FileNotFoundError as e:
+        except NotFoundError as e:
             logger.warning(f"资源不存在 [{func.__name__}]: {str(e)}")
             return error(str(e), code=404)
+        except AuthError as e:
+            logger.warning(f"认证失败 [{func.__name__}]: {str(e)}")
+            return error(str(e), code=401)
         except TimeoutError as e:
             logger.error(f"请求超时 [{func.__name__}]: {str(e)}")
             return error("请求超时，请稍后重试", code=504)

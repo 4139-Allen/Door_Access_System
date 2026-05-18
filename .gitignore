@@ -33,11 +33,12 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 
-# 测试和覆盖率
+# 测试相关
 .pytest_cache/
 .coverage
 htmlcov/
-.tox/
+test.db
+*.cover
 
 # Jupyter Notebook
 .ipynb_checkpoints

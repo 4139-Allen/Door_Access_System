@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from database.db import get_db
 from utils.auth import get_current_user_obj
-from utils.response import success, handle_api_exception
+from core.api_exception_handler import handle_api_exception
+from core.response_schema import success
 from database.models.user import User
 from services.stat_service import get_statistics
 import json

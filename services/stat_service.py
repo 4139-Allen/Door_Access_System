@@ -4,7 +4,7 @@ from database.models.device import Device
 from database.models.door_log import DoorLog
 from database.models.user_device import UserDevice
 from datetime import datetime, date
-from utils.exceptions import handle_query_exception
+from utils.service_exception import handle_query_exception
 from typing import TypedDict
 
 

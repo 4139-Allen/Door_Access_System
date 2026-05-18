@@ -3,10 +3,11 @@ from database.models.user_device import UserDevice
 from database.models.user import User
 from sqlalchemy.orm import Session
 from schemas.device_schema import DeviceCreate, DeviceUpdate
-from utils.exceptions import service_exception_handler
+from utils.service_exception import service_exception_handler
 from typing import Optional, List
 from database.redis import redis_client
 from utils.logger import AppLogger
+from core.exceptions import NotFoundError
 
 logger = AppLogger.get_logger()
 
@@ -139,7 +140,7 @@ def delete_device(db: Session, device_id: int) -> bool:
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
         logger.warning(f"⚠️  删除设备失败 | 设备ID: {device_id} | 原因: 设备不存在")
-        raise ValueError("设备不存在")
+        raise NotFoundError("设备不存在")
 
     # 检查是否有绑定关系
     has_bind = db.query(UserDevice).filter(UserDevice.device_id == device_id).first()
@@ -215,7 +216,11 @@ def bind_user_device(db: Session, user_id: int, device_id: int, operator_id: Opt
     # 验证设备是否存在
     device = db.query(Device).filter(Device.id == device_id).first()
     if not device:
-        raise ValueError("设备不存在")
+        raise NotFoundError("设备不存在")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise NotFoundError("用户不存在")
 
     # 获取用户信息
     user = db.query(User).filter(User.id == user_id).first()

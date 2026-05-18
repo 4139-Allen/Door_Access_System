@@ -1,4 +1,5 @@
 """
+服务层异常/事务
 通用异常处理装饰器和工具函数
 用于统一 Service 层的异常处理和日志记录
 """
@@ -46,15 +47,15 @@ def service_exception_handler(func: Callable) -> Callable:
             # 记录错误日志
             logger.error(f"Service [{func.__name__}] 执行失败: {str(e)}", exc_info=True)
 
-            # 重新抛出异常，让 API 层决定如何响应
-            raise Exception(f"{func.__name__} 执行失败: {str(e)}")
+            # 抛出异常
+            raise
 
     return wrapper
 
 
 def handle_query_exception(default_value: Any = None):
     """
-    查询类操作的异常处理装饰器
+    Service层 查询类操作的异常处理装饰器
 
     参数:
         default_value: 发生异常时的默认返回值

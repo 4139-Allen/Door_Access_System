@@ -6,7 +6,8 @@ from database.models.user import User
 from schemas.user_schema import UserLogin, UserCreate, PasswordChange
 from services.user_service import (login_user, db_create_user, delete_user_by_id,
                get_users_list, get_user_devices, change_user_password)
-from utils.response import success, error, handle_api_exception
+from core.api_exception_handler import handle_api_exception
+from core.response_schema import success, error
 from utils.auth import logout_token, get_current_user_obj, security, require_admin
 from typing import Optional
 
