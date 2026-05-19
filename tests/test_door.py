@@ -53,16 +53,13 @@ class TestOpenDoorService:
 
     def test_user_without_permission_cannot_open_door(self, db_session, test_user, test_device):
         """测试无权限的普通用户不能开门"""
-        success, message = open_door_service(
-            db_session,
-            test_user.id,
-            test_device.id,
-            "user"
-        )
-
-        assert success is False
-        assert "无权限" in message
-
+        with pytest.raises(PermissionError, match="无权限操作：你未绑定该设备，无法开门"):
+            open_door_service(
+                db_session,
+                test_user.id,
+                test_device.id,
+                "user"
+            )
         # 验证失败日志已创建
         log = db_session.query(DoorLog).filter(
             DoorLog.user_id == test_user.id,
@@ -74,15 +71,14 @@ class TestOpenDoorService:
 
     def test_open_nonexistent_device(self, db_session, test_user):
         """测试打开不存在的设备"""
-        success, message = open_door_service(
-            db_session,
-            test_user.id,
-            99999,
-            "user"
-        )
-
-        # 应该能处理不存在设备的情况（可能抛出异常或返回失败）
-        assert success is False or "失败" in message
+        from core.exceptions import NotFoundError
+        with pytest.raises(NotFoundError, match="设备不存在"):
+            open_door_service(
+                db_session,
+                test_user.id,
+                99999,  # 不存在的设备
+                "user"
+            )
 
 
 class TestCreateLog:

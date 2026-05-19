@@ -88,9 +88,8 @@ def create_log(db: Session, user_id: int, device_id: int, action: str, status: s
     return log
 
 
-# ==========================================
-# 3. 日志查询功能
-# ==========================================
+
+# =================== 3. 日志查询功能======================
 def query_logs(
         db: Session,
         params: LogQuery,

@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from database.db import Base, get_db
+from database.redis import redis_client
 from database.models.user import User
 from database.models.device import Device
 from database.models.door_log import DoorLog
@@ -21,7 +22,11 @@ from main import app
 import os
 
 # 使用内存 SQLite 数据库进行测试
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
+# 内存数据库，不生成文件（最干净）
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+
+# 文件数据库
+# SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
@@ -30,6 +35,22 @@ engine = create_engine(
 )
 
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# ====================== 测试结束删除 test.db ======================
+@pytest.fixture(scope="session", autouse=True)
+def auto_clean_test_files():
+    """
+    测试会话结束后自动清理 test.db 垃圾文件
+    不管成功失败，最后都会清理
+    """
+    yield  # 等待所有测试跑完
+
+    # 测试结束后删除文件数据库（如果存在）
+    test_db_file = "./test.db"
+    if os.path.exists(test_db_file):
+        os.remove(test_db_file)
+        print("\n✅ 测试完成，已自动清理 test.db")
 
 
 @pytest.fixture(scope="function")
@@ -131,3 +152,13 @@ def fresh_manager():
     """提供干净的 ConnectionManager 实例用于测试"""
     from services.websocket_service import ConnectionManager
     return ConnectionManager()
+
+@pytest.fixture(scope="function", autouse=True)
+def clean_redis_before_test():
+    """每次测试前清空 Redis，保证完全隔离"""
+    try:
+        if redis_client:
+            redis_client.flushdb()
+    except:
+        pass
+    yield

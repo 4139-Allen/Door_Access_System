@@ -76,7 +76,8 @@ class TestDeleteUser:
 
     def test_delete_nonexistent_user(self, db_session):
         """测试删除不存在的用户抛出异常"""
-        with pytest.raises(ValueError, match="用户不存在"):
+        from core.exceptions import NotFoundError
+        with pytest.raises(NotFoundError, match="用户不存在"):
             delete_user_by_id(db_session, 99999)
 
 

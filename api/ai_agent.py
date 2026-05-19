@@ -8,14 +8,14 @@ from services.ai_agent_service import process_ai_chat_command
 from core.api_exception_handler import handle_api_exception
 from core.response_schema import success
 
-router = APIRouter(prefix="/ai", tags=["🤖 AI指令开门"])
+router = APIRouter(tags=["🤖 AI指令开门"])
 
 
 class ChatRequest(BaseModel):
     message: str
 
 
-@router.post("/chat", summary="AI 智能开门", description="通过自然语言指令控制门禁设备")
+@router.post("/ai/chat", summary="AI 智能开门", description="通过自然语言指令控制门禁设备")
 @handle_api_exception
 def ai_chat(
         req: ChatRequest,

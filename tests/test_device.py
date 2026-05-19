@@ -1,4 +1,3 @@
-NEW_FILE_CODE
 """
 设备服务单元测试
 测试设备 CRUD、权限检查、缓存管理等功能
@@ -47,19 +46,19 @@ class TestCreateDevice:
         assert device.location == "教学楼"
         assert device.status == "online"
 
-    def test_create_device_empty_name(self, db_session):
-        """测试创建空名称设备抛出异常"""
-        data = DeviceCreate(name="", location="教学楼")
+    def test_create_device_with_empty_name(self, client, admin_headers):
+        """测试创建空名称设备（预期参数校验失败）"""
+        from pydantic import ValidationError
 
-        with pytest.raises(ValueError, match="设备名称不能为空"):
-            create_device(db_session, data)
+        with pytest.raises(ValidationError):
+            data = DeviceCreate(name="", location="教学楼")
 
     def test_create_device_empty_location(self, db_session):
         """测试创建空位置设备抛出异常"""
-        data = DeviceCreate(name="002", location="")
+        from pydantic import ValidationError
 
-        with pytest.raises(ValueError, match="设备位置不能为空"):
-            create_device(db_session, data)
+        with pytest.raises(ValidationError):
+            data = DeviceCreate(name="099", location="")
 
     def test_create_duplicate_device(self, db_session):
         """测试创建重复设备抛出异常"""
@@ -123,7 +122,8 @@ class TestDeleteDevice:
 
     def test_delete_nonexistent_device(self, db_session):
         """测试删除不存在的设备抛出异常"""
-        with pytest.raises(ValueError, match="设备不存在"):
+        from core.exceptions import NotFoundError
+        with pytest.raises( NotFoundError, match="设备不存在"):
             delete_device(db_session, 99999)
 
     def test_delete_bound_device(self, db_session, test_user):
@@ -198,7 +198,8 @@ class TestBindUserDevice:
 
     def test_bind_nonexistent_device(self, db_session, test_user):
         """测试绑定不存在的设备抛出异常"""
-        with pytest.raises(ValueError, match="设备不存在"):
+        from core.exceptions import NotFoundError
+        with pytest.raises(NotFoundError, match="设备不存在"):
             bind_user_device(db_session, test_user.id, 99999)
 
 

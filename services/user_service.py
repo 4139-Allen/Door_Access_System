@@ -101,7 +101,7 @@ def delete_user_by_id(db: Session, user_id: int) -> bool:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         logger.warning(f"⚠️  删除用户失败 | 用户ID: {user_id} | 原因: 用户不存在")
-        raise NotFoundError("用户不存在")  # ✅ 这里改成 404
+        raise NotFoundError("用户不存在")
 
     username = user.username
 

@@ -9,6 +9,8 @@ import re
 import requests
 from typing import Optional
 from sqlalchemy.orm import Session
+
+from core.exceptions import NotFoundError
 from database.models.user import User
 from database.models.device import Device
 from services.door_service import open_door_service
@@ -122,7 +124,7 @@ def build_context_info(context: dict) -> str:
 def parse_ai_command(message: str, user_id: int, context: dict = None):
     """解析 AI 命令，支持上下文记忆"""
     if not AI_ENABLED:
-        return {"type": "text", "msg": "AI 功能未启用，请联系管理员配置 API Key"}
+        raise ValueError("AI 功能未启用，请联系管理员配置 API Key")
 
     # 合并上下文信息
     context_info = build_context_info(context)
@@ -145,15 +147,13 @@ def parse_ai_command(message: str, user_id: int, context: dict = None):
     try:
         response = requests.post(AI_API_URL, headers=headers, json=data, timeout=AI_TIMEOUT)
 
-        # 检查 HTTP 状态码，区分认证错误和其他错误
-        if response.status_code == 401 or response.status_code == 403:
-            logger.error(f"AI API 认证失败 (HTTP {response.status_code})，请检查 API Key 是否正确")
-            return {"type": "text", "msg": "AI API Key 无效或已过期，请联系管理员检查配置"}
+        if response.status_code in (401, 403):
+            raise ValueError("AI API Key 无效或已过期，请联系管理员检查配置")
 
         response.raise_for_status()
         ai_raw = response.json()["choices"][0]["message"]["content"].strip()
 
-        # 尝试解析为 JSON
+        # 解析 JSON
         try:
             result = json.loads(ai_raw)
             device_name = normalize_device_number(result.get("device_name", "").strip())
@@ -164,34 +164,31 @@ def parse_ai_command(message: str, user_id: int, context: dict = None):
                 location = location or (context.get('location') if context else "")
                 return {"type": "device", "name": device_name, "location": location}
             elif device_name:
-                return {"type": "text", "msg": f"请问{device_name}的设备编号是多少?请使用三位数字格式,如001、002等。"}
+                raise ValueError(f"请问{device_name}的设备编号是多少?请使用三位数字格式,如001、002等。")
             elif location:
-                return {"type": "text", "msg": f"请问{location}的哪个设备编号需要打开呢?"}
+                raise ValueError(f"请问{location}的哪个设备编号需要打开呢?")
             else:
-                return {"type": "text", "msg": "请问你想打开哪个门呢?请告诉我设备编号(如001)和位置。"}
+                raise ValueError("请问你想打开哪个门呢?请告诉我设备编号(如001)和位置。")
 
         except json.JSONDecodeError:
             return {"type": "text", "msg": ai_raw}
 
     except requests.exceptions.Timeout:
-        return {"type": "text", "msg": "AI服务超时,请稍后再试"}
+        raise ValueError("AI服务超时,请稍后再试")
     except requests.exceptions.HTTPError as e:
         status_code = e.response.status_code if e.response is not None else 0
-        logger.error(f"AI HTTP 错误 (状态码: {status_code}): {e}")
         if status_code in [401, 403]:
-            return {"type": "text", "msg": "AI API Key 无效或已过期，请联系管理员检查配置"}
+            raise ValueError("AI API Key 无效或已过期")
         elif status_code == 429:
-            return {"type": "text", "msg": "AI 服务请求过于频繁，请稍后再试"}
+            raise ValueError("AI 服务请求过于频繁，请稍后再试")
         elif status_code >= 500:
-            return {"type": "text", "msg": "AI 服务器内部错误，请稍后再试"}
+            raise ValueError("AI 服务器内部错误，请稍后再试")
         else:
-            return {"type": "text", "msg": f"AI 服务请求失败 (HTTP {status_code})"}
+            raise ValueError(f"AI 服务请求失败 (HTTP {status_code})")
     except requests.exceptions.RequestException as e:
-        logger.error(f"AI请求失败: {e}")
-        return {"type": "text", "msg": "AI服务暂时异常"}
+        raise ValueError("AI服务暂时异常")
     except Exception as e:
-        logger.error(f"AI解析异常: {e}")
-        return {"type": "text", "msg": "AI处理失败,请稍后重试"}
+        raise ValueError("AI处理失败,请稍后重试")
 
 
 def find_device_by_number_and_location(db: Session, device_number: str, location: str) -> Optional[Device]:
@@ -224,43 +221,44 @@ def find_device_by_number_and_location(db: Session, device_number: str, location
 def process_ai_chat_command(db: Session, user: User, user_message: str) -> dict:
     """
     处理 AI 聊天命令
-    要求三要素: 用户指令、设备编号(001、002...)、位置信息
     """
+    # 1. 权限错误 → 抛异常
     if user.role != "admin":
-        return {"reply": "仅管理员可使用"}
+        raise PermissionError("仅管理员可使用 AI 开门功能")
 
-    # 加载并更新上下文
+    # 加载上下文
     context = load_context_from_redis(user.id)
     context = extract_context_from_message(user_message, context)
 
-    # 解析 AI 命令
+    # 解析命令
     ai_result = parse_ai_command(user_message, user.id, context)
 
-    # 处理自然语言回复
     if ai_result["type"] == "text":
         save_context_to_redis(user.id, context)
         return {"reply": ai_result["msg"]}
 
-    # 匹配设备并开门
+    # 获取设备信息
     device_number = ai_result.get("name")
     location = ai_result.get("location", "")
 
+    # 2. 找不到设备 → 抛异常
     device = find_device_by_number_and_location(db, device_number, location)
     if not device:
-        reply = f"❌ 未找到设备:{device_number}"
+        msg = f"未找到设备：{device_number}"
         if location:
-            reply += f"(位置:{location})"
-        reply += ",请检查设备编号和位置是否正确"
-        return {"reply": reply}
+            msg += f"（位置：{location}）"
+        raise NotFoundError(msg)
 
-    # 执行开门
+    # 3. 开门（内部会抛异常）
     success_flag, message = open_door_service(db, user.id, device.id, user.role)
 
-    if success_flag:
-        reply = f"✅ 已成功开启:{device.name}"
-        if device.location:
-            reply += f"({device.location})"
-        clear_context_from_redis(user.id)
-        return {"reply": reply}
-    else:
-        return {"reply": f"❌ 开门失败:{message}"}
+    # 4. 开门失败 → 抛异常
+    if not success_flag:
+        raise ValueError(f"开门失败：{message}")
+
+    reply = f"✅ 已成功开启：{device.name}"
+    if device.location:
+        reply += f"（{device.location}）"
+    clear_context_from_redis(user.id)
+
+    return {"reply": reply}

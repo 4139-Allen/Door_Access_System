@@ -27,6 +27,10 @@ def create_access_token(data: dict) -> str:
     返回:
         str: JWT Token
     """
+    sub = data.get("sub")
+    if not sub or sub.strip() == "":
+        raise ValueError("创建Token失败：'sub' 不能为空")
+
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
@@ -38,7 +42,7 @@ def create_access_token(data: dict) -> str:
         redis_client.setex(
             f"token:{token}",
             ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-            data.get("sub")
+            sub
         )
 
     return token
@@ -46,44 +50,29 @@ def create_access_token(data: dict) -> str:
 
 # ====================== 校验用户（先查 Redis + 黑名单）======================
 def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> int:
-    """
-    验证 Token 并返回用户ID
-
-    参数:
-        credentials: HTTP Bearer Token
-
-    返回:
-        int: 用户ID
-
-    异常:
-        HTTPException: Token 无效或已过期
-    """
     token = credentials.credentials
 
-    # ====================== 【加入黑名单校验】======================
-    if redis_client and redis_client.exists(f"blacklist:{token}"):
-        raise HTTPException(status_code=401, detail="Token 已注销，请重新登录")
-
-    # 检查 Redis 是否存在（不存在直接判定失效）
-    if redis_client and not redis_client.exists(f"token:{token}"):
-        raise HTTPException(status_code=401, detail="Token 已退出登录或无效")
-
-    # 正常校验 JWT
+    # ====================== 解码 JWT，自动校验过期======================
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
-
         if user_id is None:
-            raise HTTPException(status_code=401, detail="Token中未包含用户ID（sub字段缺失）")
-
-        return int(user_id)
-
+            raise HTTPException(status_code=401, detail="Token 无效")
     except JWTError:
-        if redis_client:
-            redis_client.delete(f"token:{token}")
-        raise HTTPException(status_code=401, detail="Token无效或已过期")
+        # 自动捕获：过期、伪造、无效
+        raise HTTPException(status_code=401, detail="Token 无效或已过期")
+
+    # ====================== 校验黑名单 ======================
+    if redis_client and redis_client.exists(f"blacklist:{token}"):
+        raise HTTPException(status_code=401, detail="Token 已注销，请重新登录")
+
+    # ====================== 校验 Redis 是否存在 ======================
+    if redis_client and not redis_client.exists(f"token:{token}"):
+        raise HTTPException(status_code=401, detail="Token 已退出登录")
+
+    return int(user_id)
 
 # ====================== 退出登录（删除缓存 + 加入黑名单）======================
 def logout_token(token: str):

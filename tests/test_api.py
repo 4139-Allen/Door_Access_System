@@ -4,7 +4,7 @@ API 集成测试（接口/测试用例：19/52）
 """
 import pytest
 
-#用户认证（测试用例8）
+#用户认证（测试用例12）
 class TestUserAPI:
     """用户 API 测试"""
 
@@ -127,6 +127,41 @@ class TestUserAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 400
+
+        def test_access_with_expired_token(self, client, test_user, db_session):
+            """测试使用过期的Token访问"""
+            from utils.auth import create_access_token, logout_token
+            from database.redis import redis_client
+
+            # 创建一个正常的token
+            token = create_access_token(data={"sub": str(test_user.id)})
+
+            # 手动从Redis中删除该token，模拟过期
+            if redis_client:
+                redis_client.delete(f"token:{token}")
+
+            # 使用已"过期"的token访问
+            response = client.get("/api/devices", headers={
+                "Authorization": f"Bearer {token}"
+            })
+            assert response.status_code == 401
+            data = response.json()
+            assert "退出登录" in data.get("msg", "") or "无效" in data.get("msg", "")
+
+        def test_access_with_malformed_token(self, client):
+            """测试使用格式错误的Token"""
+            response = client.get("/api/devices", headers={
+                "Authorization": "Bearer invalid.token.here"
+            })
+            assert response.status_code == 401
+            data = response.json()
+            assert "无效" in data.get("msg", "") or "过期" in data.get("msg", "")
+
+        def test_access_without_auth_header(self, client):
+            """测试缺少Authorization头"""
+            response = client.get("/api/devices")
+            assert response.status_code == 401
+
 
 #用户管理（测试用例6）
 class TestUserManagementAPI:
@@ -352,7 +387,7 @@ class TestLogAPI:
         data = response.json()
         assert data["code"] == 200
 
-#统计数据（测试用例3）
+#统计数据（测试用例4）
 class TestStatAPI:
     """统计 API 测试"""
 
@@ -385,6 +420,20 @@ class TestStatAPI:
         assert data["data"]["device_total"] >= 0
         assert data["data"]["today_log"] >= 0
 
+    def test_statistics_caching(self, client, auth_headers):
+        """测试统计数据缓存机制"""
+        # 第一次请求
+        response1 = client.get("/api/statistics", headers=auth_headers)
+        assert response1.status_code == 200
+
+        # 第二次请求（应该使用缓存）
+        response2 = client.get("/api/statistics", headers=auth_headers)
+        assert response2.status_code == 200
+
+        # 两次数据应该一致
+        assert response1.json()["data"] == response2.json()["data"]
+
+
 #AI API（5）
 class TestAIAPI:
     """AI API 测试"""
@@ -403,10 +452,8 @@ class TestAIAPI:
         }, headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
-        assert data["code"] == 200
-        # 应该返回提示仅管理员可用
-        assert "reply" in data["data"]
-        assert "仅管理员" in data["data"]["reply"] or "权限" in data["data"]["reply"]
+        assert data["code"] == 403
+        assert "仅管理员" in data["msg"] or "权限" in data["msg"]
 
     def test_ai_chat_as_admin(self, client, admin_headers):
         """测试管理员可以使用 AI 功能"""
@@ -426,13 +473,20 @@ class TestAIAPI:
         assert response.status_code == 200
         data = response.json()
         # 应该能处理空消息
-        assert data["code"] in [200, 400]
+        assert data["code"] in [200, 400, 404]
 
     def test_ai_chat_missing_message_field(self, client, admin_headers):
         """测试 AI 聊天缺少 message 字段"""
         response = client.post("/api/ai/chat", json={}, headers=admin_headers)
         # Pydantic 验证会返回 422
         assert response.status_code in [200, 422]
+
+    def test_ai_chat_special_characters(self, client, admin_headers):
+        """测试AI聊天包含特殊字符"""
+        response = client.post("/api/ai/chat", json={
+            "message": "打开门！@#$%^&*()"
+        }, headers=admin_headers)
+        assert response.status_code == 200
 
 
 #边界情况（16）
@@ -591,5 +645,191 @@ class TestEdgeCases:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
+
+
+# 权限验证
+class TestPermissionValidation:
+    """权限验证测试"""
+
+    def test_user_cannot_access_admin_endpoints(self, client, auth_headers):
+        """测试普通用户无法访问管理员端点"""
+        # 尝试获取用户列表
+        response = client.get("/api/users", headers=auth_headers)
+        assert response.status_code == 403
+
+        # 尝试创建设备
+        response = client.post("/api/devices", json={
+            "name": "test",
+            "location": "test"
+        }, headers=auth_headers)
+        assert response.status_code == 403
+
+        # 尝试删除用户
+        response = client.delete("/api/users/1", headers=auth_headers)
+        assert response.status_code == 403
+
+    def test_user_can_only_access_own_data(self, client, auth_headers, test_user, db_session):
+        """测试普通用户只能访问自己的数据"""
+        from database.models.user import User
+        from utils.auth import hash_password
+
+        # 创建另一个用户
+        other_user = User(username="otheruser", password=hash_password("otherpass"), role="user")
+        db_session.add(other_user)
+        db_session.commit()
+
+        # 尝试查询其他用户的设备（应该被拒绝）
+        response = client.get(f"/api/users/{other_user.id}/devices", headers=auth_headers)
+        assert response.status_code == 403
+
+    def test_admin_can_access_all_endpoints(self, client, admin_headers):
+        """测试管理员可以访问所有端点"""
+        # 获取用户列表
+        response = client.get("/api/users", headers=admin_headers)
+        assert response.status_code == 200
+
+        # 创建设备
+        response = client.post("/api/devices", json={
+            "name": "admin_test",
+            "location": "test"
+        }, headers=admin_headers)
+        assert response.status_code == 200
+
+
+# 认证异常测试（新增）
+class TestAuthenticationExceptions:
+    """认证异常测试"""
+
+    def test_access_with_invalid_token_format(self, client):
+        """测试使用无效格式的Token"""
+        response = client.get("/api/devices", headers={
+            "Authorization": "InvalidFormat token123"
+        })
+        assert response.status_code == 401
+
+    def test_access_with_empty_token(self, client):
+        """测试使用空Token"""
+        response = client.get("/api/devices", headers={
+            "Authorization": "Bearer "
+        })
+        assert response.status_code == 401
+
+    def test_access_after_logout(self, client, test_user):
+        """测试退出登录后Token失效"""
+        from utils.auth import create_access_token
+
+        # 创建token
+        token = create_access_token(data={"sub": str(test_user.id)})
+
+        # 退出登录
+        client.post("/api/auth/logout", headers={"Authorization": f"Bearer {token}"})
+
+        # 使用已退出的token访问
+        response = client.get("/api/devices", headers={
+            "Authorization": f"Bearer {token}"
+        })
+        assert response.status_code == 401
+        data = response.json()
+        assert "退出" in data.get("detail", "") or "注销" in data.get("detail", "")
+
+
+# 数据验证测试（新增）
+class TestDataValidation:
+    """数据验证测试"""
+
+    def test_create_device_with_empty_name(self, client, admin_headers):
+        """测试创建空名称设备"""
+        response = client.post("/api/devices", json={
+            "name": "",
+            "location": "test"
+        }, headers=admin_headers)
+        # 应该返回验证错误
+        assert response.status_code in [422]
+        if response.status_code == 200:
+            data = response.json()
+            assert data["code"] == 400
+
+    def test_create_device_with_empty_location(self, client, admin_headers):
+        """测试创建空位置设备"""
+        response = client.post("/api/devices", json={
+            "name": "test",
+            "location": ""
+        }, headers=admin_headers)
+        # 应该返回验证错误
+        assert response.status_code in [200, 422]
+        if response.status_code == 200:
+            data = response.json()
+            assert data["code"] == 400
+
+    def test_login_with_empty_username(self, client):
+        """测试使用空用户名登录"""
+        response = client.post("/api/auth/login", json={
+            "username": "",
+            "password": "testpass123"
+        })
+        assert response.status_code in [200, 422]
+
+    def test_login_with_empty_password(self, client):
+        """测试使用空密码登录"""
+        response = client.post("/api/auth/login", json={
+            "username": "testuser",
+            "password": ""
+        })
+        assert response.status_code in [200, 422]
+
+
+# 日志查询高级测试（新增）
+class TestLogQueryAdvanced:
+    """日志查询高级功能测试"""
+
+    def test_query_logs_with_invalid_page_params(self, client, auth_headers):
+        """测试查询日志时使用无效的分页参数"""
+        response = client.get("/api/door-logs?page=0&size=0", headers=auth_headers)
+        # 应该返回验证错误
+        assert response.status_code in [200, 422]
+
+    def test_query_logs_with_large_page_size(self, client, auth_headers):
+        """测试查询日志时使用超大分页大小"""
+        response = client.get("/api/door-logs?page=1&size=1000", headers=auth_headers)
+        assert response.status_code == 422
+        data = response.json()
+        assert "detail" in data
+
+    def test_query_logs_pagination_consistency(self, client, auth_headers, test_user, test_device, db_session):
+        """测试日志分页一致性"""
+        from database.models.door_log import DoorLog
+        from datetime import datetime
+
+        # 创建多条日志
+        for i in range(15):
+            log = DoorLog(
+                user_id=test_user.id,
+                device_id=test_device.id,
+                action="开门",
+                status="成功",
+                time=datetime.now()
+            )
+            db_session.add(log)
+        db_session.commit()
+
+        # 第一页
+        response1 = client.get("/api/door-logs?page=1&size=10", headers=auth_headers)
+        data1 = response1.json()
+
+        # 第二页
+        response2 = client.get("/api/door-logs?page=2&size=10", headers=auth_headers)
+        data2 = response2.json()
+
+        assert data1["code"] == 200
+        assert data2["code"] == 200
+
+        # 验证总数一致
+        assert data1["data"]["total"] == data2["data"]["total"]
+        # 验证第一页和第二页的数据不重叠
+        page1_ids = [log["id"] for log in data1["data"]["list"]]
+        page2_ids = [log["id"] for log in data2["data"]["list"]]
+        assert len(set(page1_ids) & set(page2_ids)) == 0
+
+
 
 
