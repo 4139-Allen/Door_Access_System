@@ -9,12 +9,13 @@ const routes = [
     redirect: '/admin/dashboard',
     children: [
       { path: 'dashboard', component: () => import('../views/Dashboard.vue') },
-      { path: 'user', component: () => import('../views/Users.vue') },
-      { path: 'device', component: () => import('../views/Device.vue') },
-      { path: 'log', component: () => import('../views/Log.vue') },
-      { path: 'door', component: () => import('../views/Door.vue') }
+      { path: 'door', component: () => import('../views/Door.vue') },
+      { path: 'user', component: () => import('../views/Users.vue'), meta: { role: 'admin' } },
+      { path: 'device', component: () => import('../views/Device.vue'), meta: { role: 'admin' } },
+      { path: 'log', component: () => import('../views/Log.vue'), meta: { role: 'admin' } }
     ]
-  }
+  },
+  { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('../views/NotFound.vue') }
 ]
 
 const router = createRouter({
@@ -22,14 +23,26 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
+  const role = localStorage.getItem('role')
+
   if (to.path !== '/login' && !token) {
     next('/login')
-  } else {
-    next()
+    return
   }
+
+  if (to.path === '/login' && token) {
+    next('/admin/dashboard')
+    return
+  }
+
+  if (to.meta?.role && role !== to.meta.role) {
+    next('/admin/dashboard')
+    return
+  }
+
+  next()
 })
 
 export default router

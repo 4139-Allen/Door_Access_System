@@ -1,114 +1,130 @@
 <template>
   <div class="login-page">
     <div class="login-card">
-      <!-- 图标 + 标题 -->
+      <!-- Logo 区域 -->
       <div class="header">
         <div class="icon-box">
-          <el-icon :size="40" color="#fff">
-            <Lock />
-          </el-icon>
+          <el-icon class="lock-icon"><Lock /></el-icon>
         </div>
-        <h1 class="title">欢迎回来</h1>
-        <p class="subtitle">登录以继续访问门禁系统</p>
+        <h1 class="title">智能门禁管理系统</h1>
+        <p class="subtitle">智能识别 · 安全管控 · 高效管理</p>
       </div>
 
-      <!-- 标签页切换 -->
+      <!-- 登录 / 注册 切换 -->
       <el-tabs v-model="activeTab" class="login-tabs">
-        <el-tab-pane label="登录" name="login">
-          <el-form :model="form" class="login-form">
-            <!-- 用户名 -->
-            <div class="form-item">
-              <label class="label">用户名</label>
-              <div class="input-wrap">
+        <el-tab-pane label="系统登录" name="login">
+          <el-form ref="loginFormRef" :model="form" :rules="loginRules" class="login-form" @submit.prevent="handleLogin">
+            <el-form-item prop="username">
+              <div class="input-wrap" :class="{ 'focus': focusedField === 'login-user' }">
                 <el-icon class="input-icon"><User /></el-icon>
                 <el-input
                   v-model="form.username"
                   placeholder="请输入用户名"
                   class="custom-input"
+                  autocomplete="username"
+                  @focus="focusedField = 'login-user'"
+                  @blur="focusedField = ''"
                 />
               </div>
-            </div>
+            </el-form-item>
 
-            <!-- 密码 -->
-            <div class="form-item">
-              <label class="label">密码</label>
-              <div class="input-wrap">
+            <el-form-item prop="password">
+              <div class="input-wrap" :class="{ 'focus': focusedField === 'login-pass' }">
                 <el-icon class="input-icon"><Lock /></el-icon>
                 <el-input
+                  ref="loginPasswordRef"
                   v-model="form.password"
-                  type="password"
+                  :type="loginPwdVisible ? 'text' : 'password'"
                   placeholder="请输入密码"
                   class="custom-input"
+                  autocomplete="current-password"
+                  @focus="focusedField = 'login-pass'"
+                  @blur="focusedField = ''"
                   @keyup.enter="handleLogin"
                 />
+                <el-button text class="pwd-toggle" @click="loginPwdVisible = !loginPwdVisible">
+                  <el-icon><View v-if="loginPwdVisible" /><Hide v-else /></el-icon>
+                </el-button>
               </div>
-            </div>
+            </el-form-item>
 
-            <!-- 登录按钮 -->
             <el-button
               type="primary"
-              class="login-btn"
-              @click="handleLogin"
+              class="submit-btn"
+              :loading="loginLoading"
+              native-type="submit"
             >
-              登 录
+              安全登录
             </el-button>
           </el-form>
         </el-tab-pane>
 
-        <el-tab-pane label="注册" name="register">
-          <el-form :model="registerForm" class="login-form">
-            <!-- 用户名 -->
-            <div class="form-item">
-              <label class="label">用户名</label>
-              <div class="input-wrap">
+        <el-tab-pane label="账号注册" name="register">
+          <el-form ref="registerFormRef" :model="registerForm" :rules="registerRules" class="login-form" @submit.prevent="handleRegister">
+            <el-form-item prop="username">
+              <div class="input-wrap" :class="{ 'focus': focusedField === 'reg-user' }">
                 <el-icon class="input-icon"><User /></el-icon>
                 <el-input
                   v-model="registerForm.username"
                   placeholder="请输入用户名"
                   class="custom-input"
+                  autocomplete="username"
+                  @focus="focusedField = 'reg-user'"
+                  @blur="focusedField = ''"
                 />
               </div>
-            </div>
+            </el-form-item>
 
-            <!-- 密码 -->
-            <div class="form-item">
-              <label class="label">密码</label>
-              <div class="input-wrap">
+            <el-form-item prop="password">
+              <div class="input-wrap" :class="{ 'focus': focusedField === 'reg-pass' }">
                 <el-icon class="input-icon"><Lock /></el-icon>
                 <el-input
                   v-model="registerForm.password"
-                  type="password"
-                  placeholder="请输入密码"
+                  :type="regPwdVisible ? 'text' : 'password'"
+                  placeholder="密码至少 6 位"
                   class="custom-input"
+                  autocomplete="new-password"
+                  @focus="focusedField = 'reg-pass'"
+                  @blur="focusedField = ''"
                 />
+                <el-button text class="pwd-toggle" @click="regPwdVisible = !regPwdVisible">
+                  <el-icon><View v-if="regPwdVisible" /><Hide v-else /></el-icon>
+                </el-button>
               </div>
-            </div>
+            </el-form-item>
 
-            <!-- 确认密码 -->
-            <div class="form-item">
-              <label class="label">确认密码</label>
-              <div class="input-wrap">
+            <el-form-item prop="confirmPassword">
+              <div class="input-wrap" :class="{ 'focus': focusedField === 'reg-confirm' }">
                 <el-icon class="input-icon"><Lock /></el-icon>
                 <el-input
                   v-model="registerForm.confirmPassword"
-                  type="password"
+                  :type="regConfirmVisible ? 'text' : 'password'"
                   placeholder="请再次输入密码"
                   class="custom-input"
+                  autocomplete="new-password"
+                  @focus="focusedField = 'reg-confirm'"
+                  @blur="focusedField = ''"
                 />
+                <el-button text class="pwd-toggle" @click="regConfirmVisible = !regConfirmVisible">
+                  <el-icon><View v-if="regConfirmVisible" /><Hide v-else /></el-icon>
+                </el-button>
               </div>
-            </div>
+            </el-form-item>
 
-            <!-- 注册按钮 -->
             <el-button
               type="primary"
-              class="register-btn"
-              @click="handleRegister"
+              class="submit-btn"
+              :loading="registerLoading"
+              native-type="submit"
             >
-              注 册
+              立即注册
             </el-button>
           </el-form>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 底部版本 -->
+      <div class="footer">v2.0 · 智能门禁管理系统</div>
     </div>
   </div>
 </template>
@@ -117,28 +133,52 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Lock, User } from '@element-plus/icons-vue'
+import { User, Lock, View, Hide } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 
 const router = useRouter()
 const activeTab = ref('login')
+const focusedField = ref('')
+const loginLoading = ref(false)
+const registerLoading = ref(false)
+const loginPwdVisible = ref(false)
+const regPwdVisible = ref(false)
+const regConfirmVisible = ref(false)
+const loginFormRef = ref(null)
+const registerFormRef = ref(null)
 
-const form = ref({
-  username: '',
-  password: ''
-})
+const form = ref({ username: '', password: '' })
+const registerForm = ref({ username: '', password: '', confirmPassword: '' })
 
-const registerForm = ref({
-  username: '',
-  password: '',
-  confirmPassword: ''
-})
+const loginRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+}
+
+const validateConfirm = (rule, value, callback) => {
+  if (!value) callback(new Error('请再次输入密码'))
+  else if (value !== registerForm.value.password) callback(new Error('两次输入的密码不一致'))
+  else callback()
+}
+
+const registerRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少 6 位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validateConfirm, trigger: 'blur' }
+  ]
+}
+
 
 const handleLogin = async () => {
-  if (!form.value.username || !form.value.password) {
-    ElMessage.warning('请输入用户名和密码')
-    return
-  }
+  if (!loginFormRef.value) return
+  const valid = await loginFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  loginLoading.value = true
   try {
     const res = await request.post('/auth/login', form.value)
     if (res.code === 200) {
@@ -149,259 +189,183 @@ const handleLogin = async () => {
     } else {
       ElMessage.error(res.msg || '登录失败')
     }
-  } catch {
-    ElMessage.error('用户名或密码错误')
+  } catch (error) {
+    ElMessage.error(error.response?.data?.msg || '用户名或密码错误')
+  } finally {
+    loginLoading.value = false
   }
 }
 
 const handleRegister = async () => {
-  const { username, password, confirmPassword } = registerForm.value
-
-  // 验证是否为空
-  if (!username || !password || !confirmPassword) {
-    ElMessage.warning('请填写所有字段')
-    return
-  }
-
-  // 验证用户名长度
-  if (username.length < 1) {
-    ElMessage.error('用户名至少需要1个字符')
-    return
-  }
-
-  if (username.length > 50) {
-    ElMessage.error('用户名不能超过50个字符')
-    return
-  }
-
-  // 验证用户名格式
-  if (!/^[a-zA-Z0-9_\u4e00-\u9fa5]+$/.test(username)) {
-    ElMessage.error('用户名只能包含字母、数字、下划线和中文')
-    return
-  }
-
-  // 验证密码长度
-  if (password.length < 6) {
-    ElMessage.error(`密码至少需要6个字符（当前${password.length}个）`)
-    return
-  }
-
-  if (password.length > 72) {
-    ElMessage.error('密码不能超过72个字符')
-    return
-  }
-
-  // 验证两次密码是否一致
-  if (password !== confirmPassword) {
-    ElMessage.error('两次输入的密码不一致')
-    return
-  }
-
+  if (!registerFormRef.value) return
+  const valid = await registerFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  registerLoading.value = true
   try {
-    const res = await request.post('/auth/register', {
-      username: username,
-      password: password
-    })
-
+    const res = await request.post('/auth/register', registerForm.value)
     if (res.code === 200) {
       ElMessage.success('注册成功，请登录')
-      // 清空注册表单并切换到登录标签
-      registerForm.value = {
-        username: '',
-        password: '',
-        confirmPassword: ''
-      }
+      registerForm.value = { username: '', password: '', confirmPassword: '' }
       activeTab.value = 'login'
     } else {
       ElMessage.error(res.msg || '注册失败')
     }
   } catch (error) {
-    // 打印详细错误信息用于调试
-    console.error('注册错误:', error)
-    if (error.response) {
-      console.error('错误响应:', error.response.data)
-      // 处理 422 验证错误
-      if (error.response.status === 422) {
-        const detail = error.response.data.detail
-        if (Array.isArray(detail)) {
-          // FastAPI 验证错误格式
-          const messages = detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join('; ')
-          ElMessage.error(`数据验证失败: ${messages}`)
-        } else {
-          ElMessage.error('数据格式错误')
-        }
-        return
-      }
-    }
-    ElMessage.error(error.response?.data?.msg || error.response?.data?.message || '注册失败')
+    ElMessage.error(error.response?.data?.msg || '注册失败')
+  } finally {
+    registerLoading.value = false
   }
 }
 </script>
 
 <style scoped>
-/* 页面背景：浅色渐变 */
 .login-page {
   width: 100vw;
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #f0f4ff 0%, #e6edff 100%);
+  background: #f0f2f5;
 }
 
-/* 卡片容器 */
+/* ======== 登录卡片 ======== */
 .login-card {
-  width: 420px;
-  padding: 50px 40px;
-  background: #ffffff;
-  border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  width: 400px;
+  padding: 40px 36px 24px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
-/* 顶部图标+标题 */
+/* ======== Logo 区域 ======== */
 .header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 28px;
 }
 
 .icon-box {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 20px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 20px;
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  background: #409eff;
+  border-radius: 10px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+}
+
+.lock-icon {
+  font-size: 22px;
+  color: #fff;
 }
 
 .title {
-  margin: 0 0 10px;
-  font-size: 32px;
-  font-weight: 700;
-  color: #1f2937;
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .subtitle {
   margin: 0;
-  font-size: 16px;
-  color: #6b7280;
+  font-size: 13px;
+  color: #909399;
 }
 
-/* 标签页样式 */
-.login-tabs {
-  margin-top: 20px;
-}
-
+/* ======== 标签页 ======== */
 .login-tabs :deep(.el-tabs__header) {
-  margin-bottom: 20px;
-}
-
-.login-tabs :deep(.el-tabs__nav-wrap::after) {
-  height: 1px;
+  margin-bottom: 22px;
 }
 
 .login-tabs :deep(.el-tabs__item) {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 500;
+  height: 40px;
+  line-height: 40px;
 }
 
-.login-tabs :deep(.el-tabs__item.is-active) {
-  color: #667eea;
-}
-
-.login-tabs :deep(.el-tabs__active-bar) {
-  background-color: #667eea;
-}
-
-/* 表单样式 */
+/* ======== 表单 ======== */
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
-.form-item {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.label {
-  font-size: 16px;
-  font-weight: 500;
-  color: #1f2937;
+.login-form .el-form-item {
+  margin-bottom: 0;
+  width: 100%;
 }
 
 .input-wrap {
-  position: relative;
+  width: 100%;
 }
 
 .input-icon {
   position: absolute;
-  left: 18px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: 20px;
-  color: #9ca3af;
+  font-size: 16px;
+  color: #c0c4cc;
   z-index: 1;
 }
 
-.custom-input {
-  width: 100%;
-}
+.custom-input { width: 100%; }
 
 .custom-input :deep(.el-input__wrapper) {
-  padding-left: 48px;
-  border-radius: 999px;
-  height: 52px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  box-shadow: none;
-}
-
-.custom-input :deep(.el-input__wrapper:hover) {
-  border-color: #667eea;
+  padding-left: 44px;
+  padding-right: 40px;
+  height: 44px;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
 }
 
 .custom-input :deep(.el-input__wrapper.is-focus) {
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+  box-shadow: 0 0 0 1px #409eff inset;
 }
 
-/* 登录按钮 */
-.login-btn {
-  width: 100%;
-  height: 52px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+.custom-input :deep(.el-input__inner) {
+  font-size: 14px;
+}
+
+.pwd-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  font-size: 16px;
   border: none;
-  font-size: 18px;
-  font-weight: 500;
-  margin-top: 8px;
-  transition: all 0.3s ease;
+  padding: 4px;
+  color: #c0c4cc;
 }
 
-.login-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+.pwd-toggle:hover {
+  background: transparent;
+  color: #909399;
 }
 
-/* 注册按钮 */
-.register-btn {
+/* ======== 提交按钮 ======== */
+.submit-btn {
   width: 100%;
-  height: 52px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  font-size: 18px;
+  height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
   font-weight: 500;
-  margin-top: 8px;
-  transition: all 0.3s ease;
+  margin-top: 4px;
 }
 
-.register-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+.submit-btn :deep(.el-loading-spinner) .path {
+  stroke: #fff;
+}
+
+/* ======== 底部 ======== */
+.footer {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid #f0f2f5;
+  font-size: 12px;
+  color: #c0c4cc;
 }
 </style>

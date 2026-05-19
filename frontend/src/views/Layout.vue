@@ -1,101 +1,79 @@
 <template>
-  <el-container style="height: 100vh;">
-    <el-aside width="200px" style="background-color: #2f4050;">
-      <div style="height:60px;line-height:60px;text-align:center;color:#fff;font-size:18px;border-bottom:1px solid #333;">
-        智能门禁管理系统
-      </div>
-      <el-menu
-        background-color="#2f4050"
-        text-color="#fff"
-        active-text-color="#409eff"
-        router
-      >
-        <el-menu-item index="/admin/dashboard">首页</el-menu-item>
-        <el-menu-item index="/admin/door">用户开门</el-menu-item>
-        <el-menu-item index="/admin/user" v-if="role === 'admin'">用户管理</el-menu-item>
-        <el-menu-item index="/admin/device" v-if="role === 'admin'">设备管理</el-menu-item>
-        <el-menu-item index="/admin/log" v-if="role === 'admin'">门禁日志</el-menu-item>
-      </el-menu>
-    </el-aside>
+  <el-container class="layout-container">
+    <!-- 侧边栏 -->
+    <SidebarMenu :role="role" />
 
-    <el-container>
-      <el-header style="background:#fff;border-bottom:1px solid #eee;display:flex;justify-content:space-between;align-items:center;padding:0 20px;">
-        <span>欢迎{{ role === 'admin' ? '管理员' : '普通用户' }}</span>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <el-button type="primary" link @click="showPasswordDialog = true">
-            <el-icon><Lock /></el-icon>
-            修改密码
+    <el-container class="main-container">
+      <!-- 顶部栏 -->
+      <el-header class="app-header">
+        <div class="header-left">
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">首页</el-breadcrumb-item>
+            <el-breadcrumb-item>{{ currentPageName }}</el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+
+        <div class="header-right">
+          <el-button text class="header-btn" @click="showPasswordDialog = true">
+            <el-icon style="font-size:16px"><Lock /></el-icon>
+            <span>修改密码</span>
           </el-button>
-          <el-button text @click="logout">退出登录</el-button>
+          <div class="header-divider"></div>
+          <el-button text class="header-btn logout-btn" @click="logout">
+            <span class="logout-icon">⇠</span>
+            <span>退出登录</span>
+          </el-button>
         </div>
       </el-header>
-      <el-main style="background:#f5f7fa;padding:20px;">
-        <router-view></router-view>
+
+      <!-- 主内容 -->
+      <el-main class="app-main">
+        <router-view v-slot="{ Component }">
+          <transition name="fade-slide" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
 
-  <!-- 修改密码对话框 -->
-  <el-dialog
-    v-model="showPasswordDialog"
-    title="修改密码"
-    width="450px"
-    :close-on-click-modal="false"
-  >
-    <el-form
-      ref="passwordFormRef"
-      :model="passwordForm"
-      :rules="passwordRules"
-      label-width="100px"
-    >
-      <el-form-item label="原密码" prop="old_password">
-        <el-input
-          v-model="passwordForm.old_password"
-          type="password"
-          placeholder="请输入原密码"
-          show-password
-        />
-      </el-form-item>
-      <el-form-item label="新密码" prop="new_password">
-        <el-input
-          v-model="passwordForm.new_password"
-          type="password"
-          placeholder="请输入新密码（6-72个字符）"
-          show-password
-        />
-      </el-form-item>
-      <el-form-item label="确认新密码" prop="confirm_password">
-        <el-input
-          v-model="passwordForm.confirm_password"
-          type="password"
-          placeholder="请再次输入新密码"
-          show-password
-        />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button @click="showPasswordDialog = false">取消</el-button>
-      <el-button type="primary" @click="handleChangePassword" :loading="changing">
-        确定
-      </el-button>
-    </template>
-  </el-dialog>
+  <!-- 修改密码弹窗 -->
+  <ChangePasswordModal
+    v-model:show="showPasswordDialog"
+    :form="passwordForm"
+    :rules="passwordRules"
+    :loading="changing"
+    @cancel="showPasswordDialog = false"
+    @confirm="handleChangePassword"
+    ref="passwordModal"
+  />
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { Lock } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
+import ChangePasswordModal from '@/components/Layout/ChangePasswordModal.vue'
 
 const router = useRouter()
+const route = useRoute()
 const role = ref(localStorage.getItem('role') || '')
-
-// 修改密码相关
 const showPasswordDialog = ref(false)
-const passwordFormRef = ref(null)
 const changing = ref(false)
+const passwordModal = ref(null)
+
+const pageNames = {
+  '/admin/dashboard': '仪表盘',
+  '/admin/door': '用户开门',
+  '/admin/user': '用户管理',
+  '/admin/device': '设备管理',
+  '/admin/log': '门禁日志',
+}
+
+const currentPageName = computed(() => pageNames[route.path] || '')
 
 const passwordForm = reactive({
   old_password: '',
@@ -103,61 +81,44 @@ const passwordForm = reactive({
   confirm_password: ''
 })
 
-// 验证确认密码
 const validateConfirmPassword = (rule, value, callback) => {
-  if (value === '') {
-    callback(new Error('请再次输入新密码'))
-  } else if (value !== passwordForm.new_password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
+  if (!value) callback(new Error('请确认新密码'))
+  else if (value !== passwordForm.new_password) callback(new Error('两次密码不一致'))
+  else callback()
 }
 
 const passwordRules = {
-  old_password: [
-    { required: true, message: '请输入原密码', trigger: 'blur' },
-    { min: 6, max: 72, message: '密码长度为6-72个字符', trigger: 'blur' }
-  ],
-  new_password: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
-    { min: 6, max: 72, message: '密码长度为6-72个字符', trigger: 'blur' }
-  ],
-  confirm_password: [
-    { required: true, validator: validateConfirmPassword, trigger: 'blur' }
-  ]
+  old_password: [{ required: true, message: '请输入原密码', trigger: 'blur' }, { min: 6 }],
+  new_password: [{ required: true, message: '请输入新密码', trigger: 'blur' }, { min: 6 }],
+  confirm_password: [{ required: true, validator: validateConfirmPassword, trigger: 'blur' }]
 }
 
 const handleChangePassword = async () => {
-  if (!passwordFormRef.value) return
+  const modal = passwordModal.value
+  if (!modal) return
+  const formRef = modal.passwordFormRef
+  if (!formRef) return
 
-  await passwordFormRef.value.validate(async (valid) => {
+  await formRef.validate(async (valid) => {
     if (!valid) return
-
     changing.value = true
     try {
       const res = await request.put('/auth/password', {
         old_password: passwordForm.old_password,
         new_password: passwordForm.new_password
       })
-
       if (res.code === 200) {
         ElMessage.success('密码修改成功，请重新登录')
         showPasswordDialog.value = false
-        // 清空表单
         passwordForm.old_password = ''
         passwordForm.new_password = ''
         passwordForm.confirm_password = ''
-        // 退出登录
-        setTimeout(() => {
-          logout()
-        }, 1500)
+        setTimeout(logout, 500)
       } else {
-        ElMessage.error(res.msg || '密码修改失败')
+        ElMessage.error(res.msg || '修改失败')
       }
-    } catch (error) {
-      console.error('修改密码错误:', error)
-      ElMessage.error(error.response?.data?.msg || '密码修改失败')
+    } catch (err) {
+      ElMessage.error(err.response?.data?.msg || '修改失败')
     } finally {
       changing.value = false
     }
@@ -167,20 +128,125 @@ const handleChangePassword = async () => {
 const logout = async () => {
   try {
     await request.post('/auth/logout')
-  } catch (e) {
-    console.log('退出请求失败', e)
-  } finally {
-    localStorage.clear()
-    ElMessage.success('已退出')
-    router.push('/login')
+  } catch {
+    // 忽略退出登录的接口错误
   }
+  localStorage.clear()
+  ElMessage.success('已退出登录')
+  router.push('/login')
 }
 </script>
 
 <style scoped>
-:deep(.el-menu-item.is-active) {
-  background-color: #1f2d3d !important;
-  border-left: 4px solid #409eff;
-  color: #fff !important;
+.layout-container {
+  height: 100vh;
+  background: #f1f5f9;
+}
+
+.main-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ======== 顶部栏 ======== */
+.app-header {
+  height: 56px !important;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 28px !important;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-left :deep(.el-breadcrumb__inner) {
+  font-size: 14px;
+}
+
+.header-left :deep(.el-breadcrumb__inner.is-link) {
+  color: #64748b;
+  font-weight: 400;
+}
+
+.header-left :deep(.el-breadcrumb__inner.is-link:hover) {
+  color: #6366f1;
+}
+
+.header-left :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner) {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.header-btn {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 13px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-btn:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.logout-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
+}
+
+.header-divider {
+  width: 1px;
+  height: 20px;
+  background: #e2e8f0;
+  margin: 0 6px;
+}
+
+.logout-icon {
+  font-size: 14px;
+}
+
+/* ======== 主内容 ======== */
+.app-main {
+  background: #f1f5f9;
+  padding: 20px 24px;
+  overflow-y: auto;
+  height: calc(100vh - 56px);
+}
+
+/* ======== 页面过渡动画 ======== */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-12px);
 }
 </style>

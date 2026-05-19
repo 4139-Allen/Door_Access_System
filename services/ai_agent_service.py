@@ -6,6 +6,8 @@ AI Agent 服务层
 """
 import json
 import re
+from datetime import date, datetime
+
 import requests
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -13,6 +15,7 @@ from sqlalchemy.orm import Session
 from core.exceptions import NotFoundError
 from database.models.user import User
 from database.models.device import Device
+from database.models.door_log import DoorLog
 from services.door_service import open_door_service
 from core.config import DEEPSEEK_API_KEY, AI_API_URL, AI_MODEL, AI_TIMEOUT, AI_TEMPERATURE, AI_ENABLED
 from core.ai_system_prompt import get_ai_system_prompt
@@ -156,10 +159,22 @@ def parse_ai_command(message: str, user_id: int, context: dict = None):
         # 解析 JSON
         try:
             result = json.loads(ai_raw)
-            device_name = normalize_device_number(result.get("device_name", "").strip())
-            location = result.get("location", "").strip()
+            cmd_type = result.get("type", "").strip()
 
-            # 校验设备编号格式
+            if cmd_type == "query":
+                target = result.get("target", "").strip()
+                if target:
+                    return {"type": "query", "target": target}
+                raise ValueError("请问你想查询什么数据呢？")
+
+            if cmd_type == "device":
+                device_name = normalize_device_number(result.get("name", "").strip())
+                location = result.get("location", "").strip()
+            else:
+                # 兼容旧格式：无 type 字段
+                device_name = normalize_device_number(result.get("device_name", "").strip())
+                location = result.get("location", "").strip()
+
             if device_name and len(device_name) == 3 and device_name.isdigit():
                 location = location or (context.get('location') if context else "")
                 return {"type": "device", "name": device_name, "location": location}
@@ -218,6 +233,83 @@ def find_device_by_number_and_location(db: Session, device_number: str, location
     return None
 
 
+def execute_query(db: Session, user: User, target: str) -> str:
+    """执行 AI 数据查询并返回自然语言结果"""
+    today_start = datetime.combine(date.today(), datetime.min.time())
+
+    if target == "today_log_count":
+        query = db.query(DoorLog)
+        if user.role != "admin":
+            query = query.filter(DoorLog.user_id == user.id)
+        count = query.filter(DoorLog.time >= today_start).count()
+        return f"今日共开门 {count} 次"
+
+    if target == "today_logs":
+        query = db.query(
+            DoorLog, Device.name.label("device_name"),
+            Device.location.label("device_location")
+        ).outerjoin(Device, DoorLog.device_id == Device.id
+        ).filter(DoorLog.time >= today_start
+        ).order_by(DoorLog.time.desc()).limit(20)
+
+        if user.role != "admin":
+            query = query.filter(DoorLog.user_id == user.id)
+
+        rows = query.all()
+        if not rows:
+            return "今日暂无开门记录"
+
+        lines = ["今日开门记录："]
+        for log, device_name, device_location in rows:
+            loc = f"（{device_location}）" if device_location else ""
+            lines.append(f"- {log.time}  {device_name or '未知设备'}{loc}  {log.status}")
+        return "\n".join(lines)
+
+    if target == "device_list":
+        devices = db.query(Device).all()
+        if not devices:
+            return "系统中暂无设备"
+        lines = ["系统中的设备列表："]
+        for d in devices:
+            status_str = "在线" if d.status == "online" else "离线"
+            lines.append(f"- {d.name}（{d.location or '未知位置'}）— {status_str}")
+        return "\n".join(lines)
+
+    if target == "device_status":
+        total = db.query(Device).count()
+        online = db.query(Device).filter(Device.status == "online").count()
+        offline = total - online
+        return f"设备状态统计：总计 {total} 台，在线 {online} 台，离线 {offline} 台"
+
+    if target == "user_count":
+        count = db.query(User).count()
+        return f"系统共有 {count} 个用户"
+
+    if target == "recent_logs":
+        query = db.query(
+            DoorLog, Device.name.label("device_name"),
+            Device.location.label("device_location"),
+            User.username.label("username")
+        ).outerjoin(Device, DoorLog.device_id == Device.id
+        ).outerjoin(User, DoorLog.user_id == User.id
+        ).order_by(DoorLog.time.desc()).limit(5)
+
+        if user.role != "admin":
+            query = query.filter(DoorLog.user_id == user.id)
+
+        rows = query.all()
+        if not rows:
+            return "暂无开门记录"
+
+        lines = ["最近5条开门记录："]
+        for log, device_name, device_location, username in rows:
+            loc = f"（{device_location}）" if device_location else ""
+            lines.append(f"- {log.time}  用户:{username or '未知'}  {device_name or '未知设备'}{loc}  {log.status}")
+        return "\n".join(lines)
+
+    return f"暂不支持查询「{target}」类型的数据"
+
+
 def process_ai_chat_command(db: Session, user: User, user_message: str) -> dict:
     """
     处理 AI 聊天命令
@@ -236,6 +328,10 @@ def process_ai_chat_command(db: Session, user: User, user_message: str) -> dict:
     if ai_result["type"] == "text":
         save_context_to_redis(user.id, context)
         return {"reply": ai_result["msg"]}
+
+    if ai_result["type"] == "query":
+        reply = execute_query(db, user, ai_result["target"])
+        return {"reply": reply}
 
     # 获取设备信息
     device_number = ai_result.get("name")

@@ -1,76 +1,142 @@
 <template>
-  <div style="padding: 30px">
-    <h1>欢迎进入门禁管理系统</h1>
-    <el-row :gutter="20" style="margin-top: 30px">
-      <el-col :span="6" v-if="role === 'admin'">
-        <el-card shadow="hover">
-          <h3>用户总数</h3>
-          <p style="font-size: 24px;color:#409eff">{{ stat.user_total }}</p>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <h3>{{ role === 'admin' ? '设备总数' : '我的设备数' }}</h3>
-          <p style="font-size: 24px;color:#67c23a">{{ stat.device_total }}</p>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover">
-          <h3>{{ role === 'admin' ? '今日开门记录' : '我的今日开门记录' }}</h3>
-          <p style="font-size: 24px;color:#e6a23c">{{ stat.today_log }}</p>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- AI 悬浮按钮 -->
-    <el-button
-      type="primary"
-      circle
-      style="position: fixed; right: 30px; bottom: 30px; z-index: 9999; width:50px; height:50px; font-size:18px"
-      @click="aiDialog = true"
-    >
-      AI
-    </el-button>
-
-    <!-- AI 弹窗 -->
-    <el-dialog v-model="aiDialog" title="💬 AI 智能门禁助手" width="500px">
-      <div class="chat-box" ref="chatBox">
-        <div v-for="(item, index) in msgList" :key="index" class="msg-wrap">
-          <!-- AI消息：居左，头像在左，气泡在右 -->
-          <div v-if="item.role === 'ai'" class="ai-row">
-            <div class="avatar ai-avatar">🤖</div>
-            <div class="bubble ai-bubble">{{ item.content }}</div>
+  <div class="dashboard">
+    <!-- 欢迎横幅 -->
+    <el-card class="welcome-banner" shadow="never">
+      <div class="welcome-content">
+        <div class="welcome-left">
+          <div class="greeting-line">
+            <span class="greeting-text">{{ greetingText }}，</span>
+            <span class="greeting-role">{{ roleLabel }}</span>
           </div>
-          <!-- 用户消息：居右，头像在右，气泡在左 -->
-          <div v-else class="user-row">
-            <div class="bubble user-bubble">{{ item.content }}</div>
-            <div class="avatar user-avatar">👤</div>
-          </div>
+          <p class="welcome-sub">{{ todaySub }}</p>
+        </div>
+        <div class="welcome-right">
+          <div class="date-text">{{ dateStr }}</div>
+          <div class="time-text">{{ timeStr }}</div>
         </div>
       </div>
+    </el-card>
 
-      <div style="margin-top:10px">
-        <el-input
-          v-model="userMsg"
-          placeholder="请输入指令，例如：打开一楼大门"
-          @keyup.enter="sendMessage"
-          clearable
-        >
-          <template #append>
-            <el-button type="primary" @click="sendMessage">发送</el-button>
-          </template>
-        </el-input>
+    <!-- 统计 -->
+    <el-row :gutter="20" class="stat-row">
+      <StatCard
+        v-if="role === 'admin'"
+        title="用户总数"
+        :number="stat.user_total"
+        color="#409eff"
+      />
+      <StatCard
+        :title="role === 'admin' ? '设备总数' : '我的设备数'"
+        :number="stat.device_total"
+        color="#67c23a"
+      />
+      <StatCard
+        :title="role === 'admin' ? '今日开门记录' : '我的今日开门记录'"
+        :number="stat.today_log"
+        color="#e6a23c"
+      />
+    </el-row>
+
+    <!-- 快捷操作 -->
+    <el-card class="section-card" shadow="never">
+      <template #header>
+        <span class="section-title">快捷操作</span>
+      </template>
+      <div class="quick-actions">
+        <el-button class="action-btn" @click="goRoute('/admin/door')">快速开门</el-button>
+        <el-button class="action-btn" @click="goRoute('/admin/device')">设备管理</el-button>
+        <el-button class="action-btn" @click="goRoute('/admin/log')">查看日志</el-button>
+        <el-button v-if="role === 'admin'" class="action-btn" @click="goRoute('/admin/user')">用户管理</el-button>
       </div>
-    </el-dialog>
+    </el-card>
+
+    <!-- 最近开门记录 -->
+    <el-card class="section-card" shadow="never">
+      <template #header>
+        <span class="section-title">最近开门记录</span>
+      </template>
+      <el-table
+        v-loading="logsLoading"
+        :data="recentLogs"
+        stripe
+        empty-text="暂无开门记录"
+        style="width: 100%"
+      >
+        <el-table-column label="时间" prop="time" min-width="160" />
+        <el-table-column label="设备" prop="device_name" min-width="100" />
+        <el-table-column label="位置" prop="device_location" min-width="120" show-overflow-tooltip />
+        <el-table-column label="操作" prop="action" width="80" />
+        <el-table-column label="状态" prop="status" width="140">
+          <template #default="{ row }">
+            <el-tag
+              :type="row.status === '成功' ? 'success' : 'danger'"
+              effect="plain"
+              size="small"
+            >
+              {{ row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- AI 悬浮按钮 -->
+    <div class="ai-fab-wrap" @click="aiDialog = true">
+      <button class="ai-fab">AI</button>
+    </div>
+
+    <AiChatBox v-model:visible="aiDialog" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import request from '@/utils/request'
+import StatCard from '@/components/Dashboard/StatCard.vue'
+import AiChatBox from '@/components/Dashboard/AiChatBox.vue'
+
+const router = useRouter()
+const role = ref(localStorage.getItem('role') || '')
+const aiDialog = ref(false)
+const logsLoading = ref(false)
 
 const stat = ref({ user_total: 0, device_total: 0, today_log: 0 })
-const role = ref(localStorage.getItem('role') || '')
+const recentLogs = ref([])
+
+const now = ref(new Date())
+let timer = null
+
+const days = ['日', '一', '二', '三', '四', '五', '六']
+
+const dateStr = computed(() => {
+  const d = now.value
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${days[d.getDay()]}`
+})
+
+const timeStr = computed(() => {
+  const d = now.value
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+})
+
+const roleLabel = computed(() => role.value === 'admin' ? '管理员' : '用户')
+
+const greetingText = computed(() => {
+  const h = now.value.getHours()
+  if (h < 6) return '夜深了，注意休息'
+  if (h < 9) return '早上好'
+  if (h < 12) return '上午好'
+  if (h < 14) return '中午好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
+
+const todaySub = computed(() => {
+  const count = stat.value.today_log
+  return role.value === 'admin'
+    ? `今日共有 ${count} 条开门记录`
+    : `今日您有 ${count} 条开门记录`
+})
 
 const getStat = async () => {
   try {
@@ -81,130 +147,156 @@ const getStat = async () => {
   }
 }
 
-onMounted(() => { getStat() })
-
-const aiDialog = ref(false)
-const msgList = ref([])
-const userMsg = ref('')
-const chatBox = ref(null)
-
-// 自动滚动到底部
-const scrollToBottom = async () => {
-  await nextTick()
-  if (chatBox.value) {
-    chatBox.value.scrollTop = chatBox.value.scrollHeight
-  }
-}
-
-const sendMessage = async () => {
-  if (!userMsg.value) return
-  const msg = userMsg.value
-  userMsg.value = ''
-
-  msgList.value.push({ role: 'user', content: msg })
-  scrollToBottom()
-
+const getRecentLogs = async () => {
+  logsLoading.value = true
   try {
-    const res = await request.post('/ai/chat', { message: msg }, { timeout: 15000 })
-    msgList.value.push({
-      role: 'ai',
-      content: res.data?.reply || 'AI 收到了'
+    const res = await request.get('/door-logs', {
+      params: { page: 1, size: 5 }
     })
-    scrollToBottom()
-  } catch (err) {
-    msgList.value.push({
-      role: 'ai',
-      content: '⚠️ AI 服务异常，请重试'
-    })
-    scrollToBottom()
+    if (res.code === 200) {
+      recentLogs.value = res.data.list || []
+    }
+  } catch (e) {
+    console.error('获取最近记录失败', e)
+  } finally {
+    logsLoading.value = false
   }
 }
+
+const goRoute = (path) => {
+  router.push(path)
+}
+
+onMounted(() => {
+  getStat()
+  getRecentLogs()
+  timer = setInterval(() => {
+    now.value = new Date()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(timer)
+})
 </script>
 
 <style scoped>
-.chat-box {
-  height: 400px;
-  overflow-y: auto;
-  padding: 12px 16px;
-  background: #fafbfc;
+.dashboard {
+  padding: 4px;
+}
+
+.welcome-banner {
+  margin-bottom: 20px;
+  border: 1px solid #ebeef5;
   border-radius: 8px;
+  background: #fff;
 }
-
-/* 单条消息容器 */
-.msg-wrap {
-  margin-bottom: 16px;
-  width: 100%;
+.welcome-banner :deep(.el-card__body) {
+  padding: 24px 28px;
+}
+.welcome-content {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
-
-/* AI 左侧布局：头像 + 气泡 */
-.ai-row {
+.welcome-left {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  justify-content: flex-start;
-  width: 100%;
+  flex-direction: column;
+  gap: 6px;
 }
-
-/* 用户 右侧布局：气泡 + 头像 */
-.user-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  justify-content: flex-end;
-  width: 100%;
-}
-
-/* 头像通用样式 */
-.avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+.greeting-line {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
+  gap: 6px;
 }
-
-.ai-avatar {
-  background: #e5e6eb;
+.greeting-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #303133;
 }
-.user-avatar {
-  background: #409eff;
-  color: #fff;
-}
-
-/* 气泡样式 */
-.bubble {
-  max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  line-height: 1.5;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-}
-
-.ai-bubble {
-  background: #ffffff;
-  color: #333;
-  border: 1px solid #eee;
-  border-bottom-left-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
-
-.user-bubble {
-  background: #409eff;
-  color: #fff;
-  border-bottom-right-radius: 4px;
-}
-
-/* 滚动条美化 */
-.chat-box::-webkit-scrollbar {
-  width: 4px;
-}
-.chat-box::-webkit-scrollbar-thumb {
-  background: #ddd;
+.greeting-role {
+  font-size: 13px;
+  color: #909399;
+  background: #f0f2f5;
+  padding: 2px 10px;
   border-radius: 4px;
+}
+.welcome-sub {
+  margin: 0;
+  font-size: 14px;
+  color: #909399;
+}
+.welcome-right {
+  text-align: right;
+}
+.date-text {
+  font-size: 14px;
+  color: #606266;
+}
+.time-text {
+  font-size: 32px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: #303133;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-row {
+  margin-bottom: 0;
+}
+
+.section-card {
+  margin-top: 20px;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
+}
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.action-btn {
+  height: 40px;
+  padding: 0 20px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+.ai-fab-wrap {
+  position: fixed;
+  right: 30px;
+  bottom: 30px;
+  z-index: 9999;
+  cursor: pointer;
+}
+.ai-fab {
+  width: 48px;
+  height: 48px;
+  border: 1px solid #dcdfe6;
+  border-radius: 50%;
+  background: #fff;
+  color: #409eff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s;
+}
+.ai-fab:hover {
+  border-color: #409eff;
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.2);
+}
+
+.section-card :deep(.el-table__empty-text) {
+  color: #c0c4cc;
+  font-size: 14px;
 }
 </style>

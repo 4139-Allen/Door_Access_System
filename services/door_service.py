@@ -37,7 +37,22 @@ def open_door_service(db: Session, user_id: int, device_id: int, user_role: str)
     username = user.username
     device_name = device.name
 
-    # 3. 权限判断
+    # 3. 设备状态检查
+    if device.status != "online":
+        log = DoorLog(
+            user_id=user_id,
+            device_id=device_id,
+            action="开门",
+            status="失败：设备不在线",
+            time=datetime.now()
+        )
+        db.add(log)
+        db.commit()
+
+        logger.warning(f"🚫 开门失败 | 设备: {device_name} | 用户: {username} | 原因: 设备不在线")
+        raise PermissionError(f"设备「{device_name}」不在线，无法开门")  # 403
+
+    # 4. 权限判断
     if user_role != "admin":
         if not check_user_permission(db, user_id, device_id):
             # 记录日志
@@ -112,8 +127,10 @@ def query_logs(
     query = db.query(
         DoorLog,
         Device.name.label("device_name"),
-        Device.location.label("device_location")
-    ).outerjoin(Device, DoorLog.device_id == Device.id)
+        Device.location.label("device_location"),
+        User.username.label("username")
+    ).outerjoin(Device, DoorLog.device_id == Device.id
+    ).outerjoin(User, DoorLog.user_id == User.id)
 
     # 权限过滤：非管理员只能查看自己的日志
     if not is_admin:
@@ -155,10 +172,11 @@ def query_logs(
 
     # 格式化返回
     result = []
-    for log, device_name, device_location in logs:
+    for log, device_name, device_location, username in logs:
         result.append({
             "id": log.id,
             "user_id": log.user_id,
+            "username": username or "未知用户",
             "device_id": log.device_id,
             "device_name": device_name or "未知设备",
             "device_location": device_location or "未知位置",

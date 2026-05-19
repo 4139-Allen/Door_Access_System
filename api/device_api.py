@@ -35,39 +35,43 @@ def create(
     return success(data={"device_id": device.id}, msg="创建设备成功")
 
 
-# 获取设备列表（支持筛选 + Redis缓存）
+# 获取设备列表
 @router.get("/devices", summary="获取设备列表")
 @handle_api_exception
 def get_device_list_endpoint(
-        name: Optional[str] = Query(None, description="设备名称模糊搜索"),
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user_obj)
+    page: int = Query(1, description="页码"),
+    size: int = Query(10, description="每页条数"),
+    name: Optional[str] = Query(None, description="设备名称模糊搜索"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_obj)
 ):
-    cache_key = DEVICE_CACHE_KEY_TEMPLATE.format(user_id=current_user.id)
+    # 只有无筛选且是第一页时才使用缓存
+    use_cache = (name is None and page == 1 and size == 10 and redis_client)
 
-    # 有筛选条件 -> 不走Redis，直接查数据库
-    if not name and redis_client:
+    if use_cache:
+        cache_key = DEVICE_CACHE_KEY_TEMPLATE.format(user_id=current_user.id)
         cache_data = redis_client.get(cache_key)
         if cache_data:
             return json.loads(cache_data)
 
-    # 调用 Service 层获取设备列表
-    devices = get_device_list(
+    device_data = get_device_list(
         db=db,
         current_user_id=current_user.id,
         is_admin=(current_user.role == "admin"),
-        name=name
+        name=name,
+        page=page,
+        size=size
     )
 
-    res = success(data={"list": devices})
+    res = success(data={
+        "total": device_data["total"],
+        "list": device_data["list"]
+    })
 
-    # 无筛选才缓存
-    if not name and redis_client:
-        redis_client.setex(
-            cache_key,
-            CACHE_EXPIRE,
-            json.dumps(res, ensure_ascii=False)
-        )
+    # 只有第一页默认配置才缓存
+    if use_cache and redis_client:
+        cache_key = DEVICE_CACHE_KEY_TEMPLATE.format(user_id=current_user.id)
+        redis_client.setex(cache_key, CACHE_EXPIRE, json.dumps(res, ensure_ascii=False))
 
     return res
 

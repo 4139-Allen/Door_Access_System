@@ -65,7 +65,12 @@ def list_users(
 ):
     total, users = get_users_list(db, page, size, username, role)
     return success({
-        "list": [{"id": u.id, "username": u.username, "role": u.role} for u in users],
+        "list": [{
+            "id": u.id,
+            "username": u.username,
+            "role": u.role,
+            "created_at": u.created_at.strftime("%Y-%m-%d %H:%M:%S") if u.created_at else ""
+        } for u in users],
         "total": total
     })
 

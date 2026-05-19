@@ -14,6 +14,7 @@ from database.models.user import User
 from database.models.device import Device
 from schemas.door_schema import LogQuery
 from services.websocket_service import manager
+from database.redis import redis_client
 
 router = APIRouter(tags=["门禁管理"])
 
@@ -32,6 +33,10 @@ def door_open(
     )
 
     if success_flag:
+        # 清除统计数据缓存，确保首页即时刷新
+        if redis_client:
+            redis_client.delete(f"stat:user:{current_user.id}")
+
         device = db.query(Device).filter(Device.id == device_id).first()
         if device:
             background_tasks.add_task(

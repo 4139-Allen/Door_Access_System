@@ -160,31 +160,18 @@ def delete_device(db: Session, device_id: int) -> bool:
 
 
 def get_device_list(
-        db: Session,
-        current_user_id: int,
-        is_admin: bool,
-        name: Optional[str] = None
-) -> List[dict]:
-    """
-    获取设备列表
-
-    参数:
-        db: 数据库会话
-        current_user_id: 当前用户ID
-        is_admin: 是否为管理员
-        name: 设备名称模糊搜索
-
-    返回:
-        list: 设备列表
-    """
-    # 基础查询
+    db: Session,
+    current_user_id: int,
+    is_admin: bool,
+    name: Optional[str] = None,
+    page: int = 1,
+    size: int = 10
+    ) -> dict:
     query = db.query(Device)
 
-    # 筛选：设备名称
     if name:
         query = query.filter(Device.name.contains(name))
 
-    # 权限过滤：非管理员只能查看已绑定的设备
     if not is_admin:
         query = query.filter(
             Device.id.in_(
@@ -192,9 +179,21 @@ def get_device_list(
             )
         )
 
-    devices = query.all()
-    return [{"id": d.id, "name": d.name, "location": d.location} for d in devices]
+    # 分页
+    total = query.count()
+    skip = (page - 1) * size
+    devices = query.offset(skip).limit(size).all()
 
+    return {
+        "total": total,
+        "list": [{
+            "id": d.id,
+            "name": d.name,
+            "location": d.location,
+            "status": d.status,
+            "created_at": d.created_at.strftime("%Y-%m-%d %H:%M:%S") if d.created_at else ""
+        } for d in devices]
+    }
 
 # ======================
 # 用户 <-> 设备 绑定/权限
