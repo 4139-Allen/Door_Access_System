@@ -6,7 +6,7 @@ from utils.auth import get_current_user_obj
 from database.models.user import User
 from services.ai_agent_service import process_ai_chat_command
 from core.api_exception_handler import handle_api_exception
-from core.response_schema import success
+from core.response_schema import ApiResponse, success
 
 router = APIRouter(tags=["🤖 AI指令开门"])
 
@@ -15,7 +15,7 @@ class ChatRequest(BaseModel):
     message: str
 
 
-@router.post("/ai/chat", summary="AI 智能开门", description="通过自然语言指令控制门禁设备")
+@router.post("/ai/chat", summary="AI 智能开门", description="通过自然语言指令控制门禁设备", response_model=ApiResponse)
 @handle_api_exception
 def ai_chat(
         req: ChatRequest,

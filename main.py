@@ -54,11 +54,12 @@ app = FastAPI(title="门禁管理系统", version="1.0", lifespan=lifespan)  #  
 # # 删除所有表
 # Base.metadata.drop_all(bind=engine)
 
-# CORS 跨域
+# CORS 跨域（* 与 allow_credentials 不兼容，浏览器会拒绝）
+allow_all_origins = "*" in ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"] if allow_all_origins else ALLOWED_ORIGINS,
+    allow_credentials=not allow_all_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

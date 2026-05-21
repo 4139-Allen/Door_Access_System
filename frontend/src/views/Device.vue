@@ -17,8 +17,10 @@
     <div class="toolbar-card">
       <div class="toolbar-section">
         <div class="section-label">搜索</div>
-        <DeviceFilter
+        <SearchFilter
           :filter-form="filterForm"
+          field="name"
+          placeholder="设备名称"
           @search="resetPageAndSearch"
           @reset="resetFilter"
         />
@@ -28,11 +30,20 @@
 
       <div class="toolbar-section">
         <div class="section-label">新增设备</div>
-        <DeviceAddForm
-          :add-form="addForm"
-          :loading="adding"
-          @add="addDevice"
-        />
+        <AddForm :loading="adding" @add="addDevice">
+          <el-input
+            v-model="addForm.name"
+            placeholder="设备名称"
+            style="width: 150px"
+            clearable
+          />
+          <el-input
+            v-model="addForm.location"
+            placeholder="设备位置"
+            style="width: 170px"
+            clearable
+          />
+        </AddForm>
       </div>
     </div>
 
@@ -85,20 +96,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, nextTick } from 'vue'
+import { useListFetch } from '@/composables/useListFetch'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import DeviceFilter from '@/components/Device/DeviceFilter.vue'
-import DeviceAddForm from '@/components/Device/DeviceAddForm.vue'
+import SearchFilter from '@/components/common/SearchFilter.vue'
+import AddForm from '@/components/common/AddForm.vue'
 import DeviceTable from '@/components/Device/DeviceTable.vue'
 
-const page = ref(1)
-const size = ref(10)
-const total = ref(0)
-const loading = ref(false)
+const {
+  dataList: deviceList, page, size, total, loading, filterForm,
+  fetchData: getDeviceList, resetPageAndSearch, resetFilter
+} = useListFetch('/devices', {
+  defaultFilter: { name: '' },
+  paramsBuilder: (f) => f.name?.trim() ? { name: f.name.trim() } : {}
+})
 
-const filterForm = ref({ name: '' })
-const deviceList = ref([])
 const addForm = ref({ name: '', location: '' })
 const adding = ref(false)
 
@@ -109,38 +122,6 @@ const editFormRef = ref(null)
 const editRules = {
   name: [{ required: true, message: '请输入设备名称', trigger: 'blur' }],
   location: [{ required: true, message: '请输入设备位置', trigger: 'blur' }]
-}
-
-watch([page, size], () => {
-  getDeviceList()
-})
-
-const getDeviceList = async () => {
-  loading.value = true
-  try {
-    const params = { page: page.value, size: size.value }
-    if (filterForm.value.name.trim()) {
-      params.name = filterForm.value.name.trim()
-    }
-    const res = await request.get('/devices', { params })
-    deviceList.value = res.data.list || []
-    total.value = res.data.total || 0
-  } catch (e) {
-    console.error('获取设备失败', e)
-  } finally {
-    loading.value = false
-  }
-}
-
-const resetPageAndSearch = () => {
-  page.value = 1
-  getDeviceList()
-}
-
-const resetFilter = () => {
-  filterForm.value.name = ''
-  page.value = 1
-  getDeviceList()
 }
 
 const addDevice = async () => {
@@ -173,6 +154,7 @@ const editDevice = (row) => {
     status: row.status || 'offline'
   }
   editDialogVisible.value = true
+  nextTick(() => editFormRef.value?.clearValidate())
 }
 
 const saveEdit = async () => {
@@ -217,110 +199,18 @@ const delDevice = async (id) => {
     }
   }
 }
-
-onMounted(() => getDeviceList())
 </script>
+
+<style>
+@import '@/styles/page.css';
+</style>
 
 <style scoped>
 .device-page {
   padding: 4px;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 20px 24px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.header-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.header-desc {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #909399;
-}
-
-.total-count {
-  font-size: 14px;
-  color: #606266;
-}
-
-.toolbar-card {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  overflow: hidden;
-}
-
-.toolbar-section {
-  flex: 1;
-  min-width: 280px;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.section-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #909399;
-}
-
-.toolbar-divider {
-  width: 1px;
-  align-self: stretch;
-  background: #ebeef5;
-  flex-shrink: 0;
-}
-
-.table-card {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.table-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
-
 @media (max-width: 900px) {
-  .toolbar-divider {
-    display: none;
-  }
-  .toolbar-section {
-    min-width: 100%;
-  }
   .page-header {
     flex-direction: column;
     align-items: flex-start;

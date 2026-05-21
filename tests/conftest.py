@@ -118,7 +118,7 @@ def test_device(db_session):
     device = Device(
         name="001",
         location="校门",
-        status="active"
+        status="online"
     )
     db_session.add(device)
     db_session.commit()

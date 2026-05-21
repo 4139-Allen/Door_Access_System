@@ -2,8 +2,10 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
 const service = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',      //baseURL: '/api'  → 交给 Nginx 转发(本地开发：'http://127.0.0.1:8000/api'; docker容器化：'/api')
+  baseURL: API_BASE ? `${API_BASE}/api` : '/api',
   timeout: 15000
 })
 
@@ -15,9 +17,6 @@ service.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
-  },
-  error => {
-    return Promise.reject(error)
   }
 )
 
@@ -25,18 +24,20 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (res) => res.data,
   (error) => {
-    // 处理 HTTP 错误状态码
+    // 被主动取消的请求（页面切换、组件卸载），不处理
+    if (axios.isCancel(error)) {
+      return Promise.reject(error)
+    }
+
     if (error.response) {
       const status = error.response.status
 
       if (status === 401) {
-        // Token 过期或无效
         ElMessage.error('登录已过期，请重新登录')
         localStorage.removeItem('token')
         localStorage.removeItem('role')
         router.push('/login')
       } else if (status === 403) {
-        // 权限不足
         ElMessage.error('无权限访问')
       } else if (status === 404) {
         ElMessage.error('请求的资源不存在')
@@ -44,7 +45,6 @@ service.interceptors.response.use(
         ElMessage.error('服务器错误，请稍后重试')
       }
     } else {
-      // 网络错误
       ElMessage.error('网络连接失败，请检查网络')
     }
 

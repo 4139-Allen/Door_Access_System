@@ -53,18 +53,3 @@ class AppLogger:
 
         cls._logger = logger
         return logger
-
-
-# 便捷函数：快速获取 logger
-def get_logger(log_name: str = "app", log_level: int = logging.INFO) -> logging.Logger:
-    """
-    快速获取 logger 实例
-
-    参数:
-        log_name: 日志名称
-        log_level: 日志级别
-
-    返回:
-        logging.Logger: logger 实例
-    """
-    return AppLogger.get_logger(log_name, log_level)

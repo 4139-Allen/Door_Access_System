@@ -32,17 +32,18 @@
         </div>
       </template>
 
-      <DoorLogFilter
+      <LogFilter
         :filter-form="filterForm"
         @search="resetPageAndSearch"
         @reset="resetFilter"
       />
 
-      <DoorLogTable
+      <LogTable
         :log-list="myLogs"
         :total="total"
         :loading="logsLoading"
-        :role="role"
+        :show-user="role === 'admin'"
+        empty-text="暂无开门记录"
         v-model:page="page"
         v-model:size="size"
       />
@@ -51,33 +52,36 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useListFetch } from '@/composables/useListFetch'
 import request from '@/utils/request'
 import { ElMessage } from 'element-plus'
 import DoorDeviceSelect from '@/components/Door/DoorDeviceSelect.vue'
-import DoorLogFilter from '@/components/Door/DoorLogFilter.vue'
-import DoorLogTable from '@/components/Door/DoorLogTable.vue'
+import LogFilter from '@/components/common/LogFilter.vue'
+import LogTable from '@/components/common/LogTable.vue'
 
 const deviceList = ref([])
-const myLogs = ref([])
 const selectedDeviceId = ref(null)
 const deviceLoading = ref(false)
-const logsLoading = ref(false)
 const doorLoading = ref(false)
-
-const page = ref(1)
-const size = ref(10)
-const total = ref(0)
 const role = ref(localStorage.getItem('role') || '')
 
-const filterForm = ref({
-  device_name: '',
-  status: '',
-  time_range: []
-})
-
-watch([page, size], () => {
-  getMyLogs()
+const {
+  dataList: myLogs, page, size, total,
+  loading: logsLoading, filterForm,
+  fetchData: getMyLogs, resetPageAndSearch, resetFilter
+} = useListFetch('/door-logs', {
+  defaultFilter: { device_name: '', status: '', time_range: [] },
+  paramsBuilder: (f) => {
+    const p = {}
+    if (f.device_name?.trim()) p.device_name = f.device_name.trim()
+    if (f.status?.trim()) p.status = f.status.trim()
+    if (f.time_range?.length === 2) {
+      p.start_time = f.time_range[0]
+      p.end_time = f.time_range[1]
+    }
+    return p
+  }
 })
 
 const getMyDevices = async () => {
@@ -100,7 +104,7 @@ const openDoor = async () => {
   doorLoading.value = true
   try {
     const res = await request.post(`/doors/${selectedDeviceId.value}/open`)
-    ElMessage.success(res.data?.msg || '开门成功')
+    ElMessage.success(res.msg || '开门成功')
     getMyLogs()
   } catch (e) {
     ElMessage.error(e.response?.data?.msg || '开门失败')
@@ -109,40 +113,8 @@ const openDoor = async () => {
   }
 }
 
-const getMyLogs = async () => {
-  logsLoading.value = true
-  try {
-    const params = { page: page.value, size: size.value }
-    if (filterForm.value.device_name?.trim()) params.device_name = filterForm.value.device_name.trim()
-    if (filterForm.value.status?.trim()) params.status = filterForm.value.status.trim()
-    if (filterForm.value.time_range?.length === 2) {
-      params.start_time = filterForm.value.time_range[0]
-      params.end_time = filterForm.value.time_range[1]
-    }
-    const res = await request.get('/door-logs', { params })
-    myLogs.value = res.data.list || []
-    total.value = res.data.total || 0
-  } catch (e) {
-    console.error('获取日志失败', e)
-  } finally {
-    logsLoading.value = false
-  }
-}
-
-const resetPageAndSearch = () => {
-  page.value = 1
-  getMyLogs()
-}
-
-const resetFilter = () => {
-  filterForm.value = { device_name: '', status: '', time_range: [] }
-  page.value = 1
-  getMyLogs()
-}
-
 onMounted(() => {
   getMyDevices()
-  getMyLogs()
 })
 </script>
 

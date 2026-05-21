@@ -1,3 +1,4 @@
+import json
 import redis
 from redis.exceptions import RedisError
 from core.config import REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD
@@ -31,3 +32,18 @@ class RedisCli:
 
 
 redis_client = RedisCli()
+
+
+def cache_get_json(key):
+    """从 Redis 获取缓存并解析 JSON，无缓存或 Redis 不可用时返回 None"""
+    if redis_client:
+        data = redis_client.get(key)
+        if data:
+            return json.loads(data)
+    return None
+
+
+def cache_set_json(key, data, expire_seconds):
+    """将数据序列化为 JSON 并存入 Redis"""
+    if redis_client:
+        redis_client.setex(key, expire_seconds, json.dumps(data, ensure_ascii=False))

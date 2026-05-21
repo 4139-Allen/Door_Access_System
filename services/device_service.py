@@ -4,7 +4,7 @@ from database.models.user import User
 from sqlalchemy.orm import Session
 from schemas.device_schema import DeviceCreate, DeviceUpdate
 from utils.service_exception import service_exception_handler
-from typing import Optional, List
+from typing import Optional
 from database.redis import redis_client
 from utils.logger import AppLogger
 from core.exceptions import NotFoundError
@@ -221,10 +221,6 @@ def bind_user_device(db: Session, user_id: int, device_id: int, operator_id: Opt
     if not user:
         raise NotFoundError("用户不存在")
 
-    # 获取用户信息
-    user = db.query(User).filter(User.id == user_id).first()
-    username = user.username if user else f"用户ID:{user_id}"
-
     # 检查是否已存在绑定关系
     exists = db.query(UserDevice).filter(
         UserDevice.user_id == user_id,
@@ -232,7 +228,7 @@ def bind_user_device(db: Session, user_id: int, device_id: int, operator_id: Opt
     ).first()
 
     if exists:
-        logger.warning(f"⚠️  绑定失败 | 用户: {username} | 设备: {device.name} | 原因: 已绑定")
+        logger.warning(f"⚠️  绑定失败 | 用户: {user.username} | 设备: {device.name} | 原因: 已绑定")
         raise ValueError("用户已绑定该设备")
 
     record = UserDevice(user_id=user_id, device_id=device_id)
@@ -245,7 +241,7 @@ def bind_user_device(db: Session, user_id: int, device_id: int, operator_id: Opt
     if operator_id and operator_id != user_id:
         invalidate_device_cache(operator_id)
 
-    logger.info(f"🔗 绑定设备成功 | 用户: {username} | 设备: {device.name} | 设备ID: {device_id}")
+    logger.info(f"🔗 绑定设备成功 | 用户: {user.username} | 设备: {device.name} | 设备ID: {device_id}")
     return record
 
 

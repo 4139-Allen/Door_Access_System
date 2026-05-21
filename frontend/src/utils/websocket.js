@@ -5,9 +5,15 @@ let lockReconnect = false
 let retryCount = 0
 const MAX_RETRY = 10
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
 function createWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  const wsUrl = `${protocol}//127.0.0.1:8000/api/ws`
+  const token = localStorage.getItem('token')
+  if (!token) return
+
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsHost = API_BASE ? API_BASE.replace(/^http/, 'ws') : `${wsProtocol}//${window.location.host}`
+  const wsUrl = `${wsHost}/api/ws?token=${token}`
   ws = new WebSocket(wsUrl)
 
   ws.onopen = () => {

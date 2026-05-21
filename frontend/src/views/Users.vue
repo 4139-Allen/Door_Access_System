@@ -17,8 +17,10 @@
     <div class="toolbar-card">
       <div class="toolbar-section">
         <div class="section-label">搜索</div>
-        <UserFilter
+        <SearchFilter
           :filter-form="filterForm"
+          field="username"
+          placeholder="用户名"
           @search="resetPageAndSearch"
           @reset="resetFilter"
         />
@@ -28,11 +30,21 @@
 
       <div class="toolbar-section">
         <div class="section-label">新增用户</div>
-        <UserAddForm
-          :add-form="addForm"
-          :loading="adding"
-          @add="addUser"
-        />
+        <AddForm :loading="adding" @add="addUser">
+          <el-input
+            v-model="addForm.username"
+            placeholder="用户名"
+            style="width: 140px"
+            clearable
+          />
+          <el-input
+            v-model="addForm.password"
+            type="password"
+            placeholder="密码 (至少6位)"
+            style="width: 170px"
+            show-password
+          />
+        </AddForm>
       </div>
 
       <div class="toolbar-divider"></div>
@@ -92,60 +104,30 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref } from 'vue'
+import { useListFetch } from '@/composables/useListFetch'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import UserFilter from '@/components/User/UserFilter.vue'
-import UserAddForm from '@/components/User/UserAddForm.vue'
+import SearchFilter from '@/components/common/SearchFilter.vue'
+import AddForm from '@/components/common/AddForm.vue'
 import UserBindForm from '@/components/User/UserBindForm.vue'
 import UserTable from '@/components/User/UserTable.vue'
 
-const userList = ref([])
+const {
+  dataList: userList, page, size, total, loading, filterForm,
+  fetchData: getUserList, resetPageAndSearch, resetFilter
+} = useListFetch('/users', {
+  defaultFilter: { username: '' },
+  paramsBuilder: (f) => f.username?.trim() ? { username: f.username.trim() } : {}
+})
+
 const addForm = ref({ username: '', password: '' })
 const bindForm = ref({ user_id: '', device_id: '' })
-const loading = ref(false)
 const adding = ref(false)
 const binding = ref(false)
 const unbinding = ref(false)
 const deviceDialogVisible = ref(false)
 const deviceList = ref([])
-
-const page = ref(1)
-const size = ref(10)
-const total = ref(0)
-const filterForm = ref({ username: '' })
-
-watch([page, size], () => {
-  getUserList()
-})
-
-const getUserList = async () => {
-  loading.value = true
-  try {
-    const params = { page: page.value, size: size.value }
-    if (filterForm.value.username.trim()) {
-      params.username = filterForm.value.username.trim()
-    }
-    const res = await request.get('/users', { params })
-    userList.value = res.data.list || []
-    total.value = res.data.total || 0
-  } catch (e) {
-    console.error(e)
-  } finally {
-    loading.value = false
-  }
-}
-
-const resetPageAndSearch = () => {
-  page.value = 1
-  getUserList()
-}
-
-const resetFilter = () => {
-  filterForm.value = { username: '' }
-  page.value = 1
-  getUserList()
-}
 
 const addUser = async () => {
   if (!addForm.value.username || !addForm.value.password) {
@@ -242,101 +224,15 @@ const unbindDevice = async () => {
     unbinding.value = false
   }
 }
-
-onMounted(() => getUserList())
 </script>
+
+<style>
+@import '@/styles/page.css';
+</style>
 
 <style scoped>
 .user-page {
   padding: 4px;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 20px 24px;
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.header-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.header-desc {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: #909399;
-}
-
-.total-count {
-  font-size: 14px;
-  color: #606266;
-}
-
-.toolbar-card {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  overflow: hidden;
-}
-
-.toolbar-section {
-  flex: 1;
-  min-width: 280px;
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.section-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #909399;
-}
-
-.toolbar-divider {
-  width: 1px;
-  align-self: stretch;
-  background: #ebeef5;
-  flex-shrink: 0;
-}
-
-.table-card {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.table-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
 }
 
 .dialog-header {
@@ -374,19 +270,5 @@ onMounted(() => getUserList())
   padding: 6px 12px;
   font-size: 13px;
   color: #606266;
-}
-
-@media (max-width: 900px) {
-  .toolbar-divider {
-    display: none;
-  }
-  .toolbar-section {
-    min-width: 100%;
-  }
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
 }
 </style>

@@ -9,7 +9,7 @@ from utils.auth import get_current_user_obj
 from database.db import get_db
 from services.door_service import open_door_service, query_logs
 from core.api_exception_handler import handle_api_exception
-from core.response_schema import success, error
+from core.response_schema import ApiResponse, success, error
 from database.models.user import User
 from database.models.device import Device
 from schemas.door_schema import LogQuery
@@ -19,7 +19,7 @@ from database.redis import redis_client
 router = APIRouter(tags=["门禁管理"])
 
 
-@router.post("/doors/{device_id}/open", summary="开启门禁")
+@router.post("/doors/{device_id}/open", summary="开启门禁", response_model=ApiResponse)
 @handle_api_exception
 def door_open(
     device_id: int,
@@ -47,10 +47,8 @@ def door_open(
             )
         return success(msg=message)
 
-    return error(message)
 
-
-@router.get("/door-logs", summary="获取开门日志")
+@router.get("/door-logs", summary="获取开门日志", response_model=ApiResponse)
 @handle_api_exception
 def get_logs(
     params: LogQuery = Depends(),

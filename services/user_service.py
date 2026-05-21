@@ -44,6 +44,7 @@ def login_user(db: Session, username: str, password: str) -> LoginResult:
     return LoginResult(token, None, user)
 
 
+@service_exception_handler
 def db_create_user(db: Session, username: str, password: str, role: str = "user") -> User:
     """
     创建新用户
@@ -59,31 +60,19 @@ def db_create_user(db: Session, username: str, password: str, role: str = "user"
 
     异常:
         ValueError: 用户名已存在
-        Exception: 数据库操作失败
     """
-    # ① 检查用户名是否存在
     existing_user = db.query(User).filter(User.username == username).first()
     if existing_user:
         logger.warning(f"⚠️  创建用户失败 | 用户名: {username} | 原因: 已存在")
         raise ValueError(f"用户名 '{username}' 已存在")
 
-    # ② 密码哈希
-    hashed_pwd = hash_password(password)
+    user = User(username=username, password=hash_password(password), role=role)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
 
-    # ③ 创建用户对象
-    user = User(username=username, password=hashed_pwd, role=role)
-
-    # ④ 保存到数据库
-    try:
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-        logger.info(f"👤 创建用户成功 | 用户名: {username} | 角色: {role} | 用户ID: {user.id}")
-        return user
-    except Exception as e:
-        db.rollback()
-        logger.error(f"❌ 创建用户失败 | 用户名: {username} | 错误: {str(e)}")
-        raise Exception(f"创建用户失败: {str(e)}")
+    logger.info(f"👤 创建用户成功 | 用户名: {username} | 角色: {role} | 用户ID: {user.id}")
+    return user
 
 @service_exception_handler
 def delete_user_by_id(db: Session, user_id: int) -> bool:
@@ -105,13 +94,12 @@ def delete_user_by_id(db: Session, user_id: int) -> bool:
 
     username = user.username
 
-    # 删除关联的门禁日志
-    db.query(DoorLog).filter(DoorLog.user_id == user_id).delete()
+    # 检查用户是否绑定了设备，已绑定则拒绝删除
+    has_bind = db.query(UserDevice).filter(UserDevice.user_id == user_id).first()
+    if has_bind:
+        raise ValueError("该用户已绑定设备，请先解绑后再删除")
 
-    # 删除关联的设备绑定
-    db.query(UserDevice).filter(UserDevice.user_id == user_id).delete()
-
-    # 删除用户
+    # 删除用户（DoorLog 由数据库 ondelete=SET NULL 自动置空 user_id）
     db.delete(user)
     db.commit()
 
@@ -162,6 +150,7 @@ def get_user_devices(db: Session, user_id: int) -> list:
     return [b.device_id for b in binds]
 
 
+@service_exception_handler
 def change_user_password(db: Session, user: User, old_password: str, new_password: str) -> bool:
     """
     修改用户密码
@@ -176,40 +165,31 @@ def change_user_password(db: Session, user: User, old_password: str, new_passwor
         bool: 是否修改成功
 
     异常:
-        ValueError: 原密码错误
-        Exception: 数据库操作失败
+        ValueError: 原密码错误或密码长度不符合要求
     """
-    # 验证原密码
     if not verify_password(old_password, user.password):
         logger.warning(f"❌ 修改密码失败 | 用户: {user.username} | 原因: 原密码错误")
         raise ValueError("原密码错误")
 
-    #密码较短
     if len(new_password) < 6:
         logger.warning(f"❌ 修改密码失败 | 用户: {user.username} | 原因: 密码长度不足6位")
         raise ValueError("密码长度不能小于6位")
 
-    # 检查新密码长度（bcrypt限制）
     if len(new_password.encode('utf-8')) > 72:
         logger.warning(f"❌ 修改密码失败 | 用户: {user.username} | 原因: 新密码过长")
         raise ValueError("新密码过长，不能超过72字节")
 
-    # 更新密码
-    try:
-        user.password = hash_password(new_password)
-        db.commit()
-        logger.info(f"🔑 修改密码成功 | 用户: {user.username} | 用户ID: {user.id}")
-        return True
-    except Exception as e:
-        db.rollback()
-        logger.error(f"❌ 修改密码失败 | 用户: {user.username} | 错误: {str(e)}")
-        raise Exception(f"修改密码失败: {str(e)}")
+    user.password = hash_password(new_password)
+    db.commit()
+
+    logger.info(f"🔑 修改密码成功 | 用户: {user.username} | 用户ID: {user.id}")
+    return True
+
 
 """
 管理员初始化
 用于创建默认管理员账户
 """
-
 def init_admin():
     """
     初始化默认管理员账户
@@ -227,37 +207,17 @@ def init_admin():
             logger.info("✅ 管理员账户已存在")
             return
 
-        # 使用配置中的管理员信息
-        admin_username = ADMIN_USERNAME
-        admin_password = ADMIN_PASSWORD
-
-        # 检查用户名是否已存在
-        existing_user = db.query(User).filter(User.username == admin_username).first()
-        if existing_user:
-            logger.warning(f"⚠️  用户名 '{admin_username}' 已存在")
-            return
-
-        # 哈希密码并创建管理员
-        hashed_password = hash_password(admin_password)
-        admin_user = User(
-            username=admin_username,
-            password=hashed_password,
-            role="admin"
-        )
-
-        db.add(admin_user)
-        db.commit()
-        db.refresh(admin_user)
+        # 复用 db_create_user 创建管理员
+        admin_user = db_create_user(db, ADMIN_USERNAME, ADMIN_PASSWORD, role="admin")
 
         logger.info("=" * 50)
         logger.info("✅ 默认管理员账户创建成功！")
-        logger.info(f"👤 用户名: {admin_username}")
-        logger.info(f"🔑 密码: {admin_password}")
+        logger.info(f"👤 用户名: {admin_user.username}")
+        logger.info(f"🔑 密码: {ADMIN_PASSWORD}")
         logger.warning("⚠️  请在首次登录后立即修改密码！")
         logger.info("=" * 50)
 
     except Exception as e:
-        db.rollback()
         logger.error(f"❌ 创建管理员失败: {str(e)}")
         raise
     finally:
