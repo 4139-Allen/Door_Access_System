@@ -77,3 +77,23 @@ frontend/*.log
 tmp/
 temp/
 *.tmp
+
+# === Keil uVision ===
+stm32/Output/
+stm32/Listing/
+stm32/Project/*.uvguix.*
+stm32/Project/DebugConfig/
+*.o
+*.crf
+*.dep
+*.axf
+*.map
+*.lst
+*.htm
+*.lnp
+*.sct
+*.iex
+*.elf
+
+# === PlatformIO ===
+stm32/ESP8266/.pio/
