@@ -20,6 +20,7 @@ from services.door_service import open_door_service
 from core.config import DEEPSEEK_API_KEY, AI_API_URL, AI_MODEL, AI_TIMEOUT, AI_TEMPERATURE, AI_ENABLED
 from core.ai_system_prompt import get_ai_system_prompt
 from database.redis import redis_client
+from services.mqtt_service import mqtt_manager
 from utils.logger import AppLogger
 
 logger = AppLogger.get_logger()
@@ -351,6 +352,9 @@ def process_ai_chat_command(db: Session, user: User, user_message: str) -> dict:
     # 4. 开门失败 → 抛异常
     if not success_flag:
         raise ValueError(f"开门失败：{message}")
+
+    # 通过 MQTT 发送开门命令到硬件设备
+    mqtt_manager.publish_command(device.name, "OPEN_DOOR")
 
     reply = f"✅ 已成功开启：{device.name}"
     if device.location:

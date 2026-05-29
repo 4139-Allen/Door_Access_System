@@ -34,6 +34,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         app_logger.error(f"⚠️ 管理员初始化失败: {e}")
 
+    # 3. 启动 MQTT 客户端
+    try:
+        from services.mqtt_service import mqtt_manager
+        mqtt_manager.start()
+    except Exception as e:
+        app_logger.error(f"⚠️ MQTT 客户端启动失败: {e}")
+
     app_logger.info("=" * 50)
     app_logger.info("✅ 门禁管理系统服务启动成功 🚀")
     app_logger.info("📍 服务地址: http://127.0.0.1:8000")
@@ -46,6 +53,13 @@ async def lifespan(app: FastAPI):
     app_logger.info("=" * 50)
     app_logger.info("🛑 门禁管理系统正在关闭...")
     app_logger.info("=" * 50)
+
+    # 关闭 MQTT 连接
+    try:
+        from services.mqtt_service import mqtt_manager
+        mqtt_manager.stop()
+    except Exception as e:
+        app_logger.error(f"MQTT 关闭失败: {e}")
 
 
 
@@ -116,4 +130,4 @@ def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)

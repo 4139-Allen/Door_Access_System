@@ -21,6 +21,9 @@ from utils.auth import hash_password
 from main import app
 import os
 
+# 测试环境下禁用频率限制
+os.environ["DISABLE_RATE_LIMITER"] = "true"
+
 # 使用内存 SQLite 数据库进行测试
 # 内存数据库，不生成文件（最干净）
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -159,6 +162,6 @@ def clean_redis_before_test():
     try:
         if redis_client:
             redis_client.flushdb()
-    except:
+    except Exception:
         pass
     yield

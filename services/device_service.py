@@ -26,10 +26,10 @@ def invalidate_device_cache(user_id: int):
 
 
 def invalidate_all_device_cache():
-    """清除所有用户的设备缓存"""
+    """清除所有用户的设备缓存（使用 SCAN 避免阻塞 Redis）"""
     if redis_client:
         pattern = "cache:device:list:user:*"
-        keys = redis_client.keys(pattern)
+        keys = list(redis_client.scan_iter(pattern))
         if keys:
             redis_client.delete(*keys)
 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from database.db import get_db
@@ -7,6 +7,7 @@ from services.user_service import login_user, change_user_password
 from core.api_exception_handler import handle_api_exception
 from core.response_schema import ApiResponse, success, error
 from utils.auth import logout_token, get_current_user_obj, security
+from utils.rate_limiter import login_limiter
 from database.models.user import User
 
 router = APIRouter(tags=["认证管理"])
@@ -14,7 +15,11 @@ router = APIRouter(tags=["认证管理"])
 
 @router.post("/auth/login", summary="用户登录", response_model=ApiResponse)
 @handle_api_exception
-def login(data: UserLogin, db: Session = Depends(get_db)):
+def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
+    # 频率限制：基于客户端 IP，5次/60秒
+    client_ip = request.client.host if request.client else "unknown"
+    login_limiter.check(client_ip)
+
     result = login_user(db, data.username, data.password)
 
     if result.error:

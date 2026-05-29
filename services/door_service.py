@@ -115,9 +115,9 @@ def query_logs(
     if params.device_name:
         conditions.append(Device.name.contains(params.device_name))
 
-    # 状态筛选
+    # 状态筛选（前缀匹配，如"失败"匹配"失败：无权限"）
     if params.status:
-        conditions.append(DoorLog.status == params.status)
+        conditions.append(DoorLog.status.startswith(params.status))
 
     # 时间范围筛选
     if params.start_time:

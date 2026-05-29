@@ -1,49 +1,24 @@
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from services.websocket_service import manager
-from jose import jwt, JWTError
-from core.config import SECRET_KEY, ALGORITHM
-from database.redis import redis_client
-from database.db import SessionLocal
-from database.models.user import User
+from fastapi import APIRouter, WebSocket
+
+from core.api_exception_handler import handle_websocket_exception
+from services.websocket_service import manager, authenticate_websocket
 
 router = APIRouter()
 
 
 @router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
-    # 验证 JWT token
-    user_id = None
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = payload.get("sub")
-        if user_id is None:
-            await websocket.close(code=1008, reason="Invalid token")
-            return
+@handle_websocket_exception
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
 
-        # 检查黑名单和 Redis 活跃 token
-        if redis_client:
-            if redis_client.exists(f"blacklist:{token}"):
-                await websocket.close(code=1008, reason="Token revoked")
-                return
-            if not redis_client.exists(f"token:{token}"):
-                await websocket.close(code=1008, reason="Token expired")
-                return
-    except JWTError:
-        await websocket.close(code=1008, reason="Invalid token")
+    # 认证（由服务层处理）
+    result = await authenticate_websocket(websocket)
+    if result is None:
         return
 
-    # 查询用户角色
-    is_admin = False
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.id == int(user_id)).first()
-        is_admin = user and user.role == "admin"
-    finally:
-        db.close()
+    user_id, is_admin = result
 
-    await manager.connect(websocket, user_id=int(user_id), is_admin=is_admin)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
+    # 注册到连接管理器（连接断开由装饰器统一处理）
+    await manager.connect(websocket, user_id=user_id, is_admin=is_admin)
+    while True:
+        await websocket.receive_text()

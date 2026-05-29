@@ -5,6 +5,46 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 版本遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.1.0] - 2026-05-29
+
+### Added
+- 📡 集成 Eclipse Mosquitto MQTT Broker
+- 🔌 MQTT 服务层（mqtt_service.py）
+- 📤 设备状态上报处理（在线/离线/开门记录）
+- 💓 设备心跳检测（70秒超时自动标记离线）
+- 📝 本地开门记录支持（密码/指纹/刷卡开门）
+- 🔧 串口转 MQTT 桥接脚本（serial_mqtt_bridge.py）
+- 🛠️ STM32 硬件驱动（AS608 指纹、RC522 RFID、LCD12864、矩阵键盘）
+- 📶 ESP8266/ESP32 MQTT 固件
+- 🌐 W5500 以太网模块支持
+- 📋 硬件说明文档
+- 📡 MQTT 相关配置项（MQTT_BROKER_HOST, MQTT_TOPIC_PREFIX 等）
+
+### Changed
+- 🏗️ 更新系统架构图，添加 MQTT 通信层
+- 📊 更新技术栈，添加 MQTT 和硬件相关内容
+- 📝 更新 README 文档，完善硬件说明
+- 🐳 Docker Compose 添加 Mosquitto 服务
+
+### Fixed
+- 修复设备在线状态缓存键名不一致问题
+
+---
+
+## [2.0.0] - 2026-05-24
+
+### Added
+- 🎨 前端界面重构，优化用户体验
+- 📊 仪表盘统计卡片优化
+- 🔍 搜索筛选功能增强
+- 📝 日志表格组件优化
+
+### Changed
+- 🎨 UI 样式优化
+- ⚡ 性能优化
+
+---
+
 ## [1.0.0] - 2026-05-16
 
 ### Added

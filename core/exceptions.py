@@ -12,3 +12,7 @@ class AuthError(Exception):
 class BusinessError(Exception):
     """业务错误"""
     pass
+
+class TooManyRequestsError(Exception):
+    """请求频率过高"""
+    pass

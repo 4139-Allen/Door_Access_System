@@ -77,6 +77,13 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD") or None
 
+# ==================== MQTT 配置 ====================
+MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "127.0.0.1")
+MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
+MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+MQTT_TOPIC_PREFIX = os.getenv("MQTT_TOPIC_PREFIX", "door")
+
 # ==================== CORS 配置 ====================
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 

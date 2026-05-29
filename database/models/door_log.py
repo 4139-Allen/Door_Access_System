@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Index
 from database.db import Base
 from datetime import datetime
+
 
 class DoorLog(Base):
     __tablename__ = "door_log"
@@ -12,3 +13,10 @@ class DoorLog(Base):
     status = Column(String(50))
     time = Column(DateTime, default=datetime.now)
 
+    # 复合索引：用户 + 时间（覆盖非管理员查自己日志 + 时间排序）
+    # 单列 time 索引：管理员全局时间范围查询
+    __table_args__ = (
+        Index("idx_door_log_user_time", "user_id", "time"),
+        Index("idx_door_log_device_id", "device_id"),
+        Index("idx_door_log_time", "time"),
+    )

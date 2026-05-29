@@ -14,6 +14,7 @@ from database.models.user import User
 from database.models.device import Device
 from schemas.door_schema import LogQuery
 from services.websocket_service import manager
+from services.mqtt_service import mqtt_manager
 from database.redis import redis_client
 
 router = APIRouter(tags=["门禁管理"])
@@ -39,6 +40,10 @@ def door_open(
 
         device = db.query(Device).filter(Device.id == device_id).first()
         if device:
+            # 发布 MQTT 开门命令给硬件设备
+            mqtt_manager.publish_command(device.name, "OPEN_DOOR")
+
+            # WebSocket 通知在线管理员
             background_tasks.add_task(
                 manager.send_to_admin,
                 username=current_user.username,
