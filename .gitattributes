@@ -37,3 +37,11 @@
 *.woff binary
 *.woff2 binary
 *.ttf binary
+
+# GitHub Linguist: 修正语言统计
+*.uvprojx linguist-language=XML
+*.uvoptx linguist-language=XML
+*.scvd linguist-language=XML
+stm32/keilkill.bat linguist-vendored
+stm32/ESP8266/mqtt_firmware/ linguist-vendored
+stm32/Libraries/** linguist-vendored
