@@ -43,12 +43,14 @@ def door_open(
             # 发布 MQTT 开门命令给硬件设备
             mqtt_manager.publish_command(device.name, "OPEN_DOOR")
 
-            # WebSocket 通知在线管理员
+            # WebSocket 通知在线管理员和绑定了该设备的用户
             background_tasks.add_task(
-                manager.send_to_admin,
+                manager.send_door_event,
+                device_id=device.id,
                 username=current_user.username,
                 device_name=device.name,
-                location=device.location
+                location=device.location,
+                action="开门"
             )
         return success(msg=message)
 

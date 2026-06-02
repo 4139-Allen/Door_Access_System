@@ -144,7 +144,7 @@ def query_logs(
         result.append({
             "id": log.id,
             "user_id": log.user_id,
-            "username": username or "未知用户",
+            "username": "本地" if log.user_id is None else (username or "未知用户"),
             "device_id": log.device_id,
             "device_name": device_name or "未知设备",
             "device_location": device_location or "未知位置",

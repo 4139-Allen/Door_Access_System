@@ -1,3 +1,4 @@
+
 /*
    ESP32-S3 MQTT 透传固件（适配 STM32 门禁系统）
 
@@ -27,7 +28,7 @@
 // ==================== 配置项（根据实际修改）====================
 const char *ssid = "iPhone";             // WiFi 名称
 const char *password = "123456889";      // WiFi 密码
-const char *mqtt_server = "172.20.10.4"; // MQTT 服务器（运行后端的电脑 IP）
+const char *mqtt_server = "47.242.179.46"; // MQTT 服务器（运行后端的服务器IP公网）
 const int mqtt_port = 1883;
 const char *device_id = "001"; // 与数据库设备名称一致
 // =============================================================

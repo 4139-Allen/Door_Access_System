@@ -8,6 +8,7 @@ from typing import Optional
 from database.redis import redis_client
 from utils.logger import AppLogger
 from core.exceptions import NotFoundError
+from services.stat_service import invalidate_all_stat_cache, invalidate_stat_cache
 
 logger = AppLogger.get_logger()
 
@@ -94,6 +95,7 @@ def create_device(db: Session, data: DeviceCreate) -> Device:
 
     # 清除所有用户的设备缓存
     invalidate_all_device_cache()
+    invalidate_all_stat_cache()
 
     logger.info(f"📱 创建设备成功 | 设备名: {device.name} | 位置: {device.location} | 设备ID: {device.id}")
     return device
@@ -118,6 +120,7 @@ def update_device(db: Session, device_id: int, data: DeviceUpdate) -> Device | N
 
     # 清除所有用户的设备缓存
     invalidate_all_device_cache()
+    invalidate_all_stat_cache()
 
     return device
 
@@ -154,6 +157,7 @@ def delete_device(db: Session, device_id: int) -> bool:
 
     # 清除所有用户的设备缓存
     invalidate_all_device_cache()
+    invalidate_all_stat_cache()
 
     logger.info(f"🗑️  删除设备成功 | 设备名: {device_name} | 设备ID: {device_id}")
     return True
@@ -184,15 +188,24 @@ def get_device_list(
     skip = (page - 1) * size
     devices = query.offset(skip).limit(size).all()
 
-    return {
-        "total": total,
-        "list": [{
+    # 叠加 Redis 实时在线状态
+    device_list = []
+    for d in devices:
+        live_status = d.status
+        if d.status == "online" and redis_client:
+            if not redis_client.exists(f"device:online:{d.name}"):
+                live_status = "offline"
+        device_list.append({
             "id": d.id,
             "name": d.name,
             "location": d.location,
-            "status": d.status,
+            "status": live_status,
             "created_at": d.created_at.strftime("%Y-%m-%d %H:%M:%S") if d.created_at else ""
-        } for d in devices]
+        })
+
+    return {
+        "total": total,
+        "list": device_list
     }
 
 # ======================
@@ -238,6 +251,7 @@ def bind_user_device(db: Session, user_id: int, device_id: int, operator_id: Opt
 
     # 清除相关用户的缓存
     invalidate_device_cache(user_id)
+    invalidate_stat_cache(user_id)
     if operator_id and operator_id != user_id:
         invalidate_device_cache(operator_id)
 
@@ -281,6 +295,7 @@ def unbind_user_device(db: Session, user_id: int, device_id: int, operator_id: O
 
     # 清除相关用户的缓存
     invalidate_device_cache(user_id)
+    invalidate_stat_cache(user_id)
     if operator_id and operator_id != user_id:
         invalidate_device_cache(operator_id)
 

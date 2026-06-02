@@ -10,32 +10,42 @@
 用法：
   python serial_mqtt_bridge.py
 
+环境变量（可选，有默认值）：
+  SERIAL_PORT       串口号，如 COM3（默认自动检测 CH340）
+  MQTT_BROKER_HOST  MQTT 地址（默认 127.0.0.1）
+  MQTT_BROKER_PORT  MQTT 端口（默认 1883）
+  MQTT_USERNAME     MQTT 用户名（默认空）
+  MQTT_PASSWORD     MQTT 密码（默认空）
+  MQTT_TOPIC_PREFIX MQTT 主题前缀（默认 door）
+  DEVICE_ID         设备编号（默认 001）
+
 依赖：
   pip install pyserial paho-mqtt
 """
 
+import os
 import serial
 import serial.tools.list_ports
 import paho.mqtt.client as mqtt
 import threading
 import time
 import sys
-from datetime import datetime
 
-# ==================== 配置 ====================
-SERIAL_PORT = None          # 自动检测，或手动指定如 'COM3'
-SERIAL_BAUD = 9600          # 波特率，与 STM32 一致
+# ==================== 配置（优先读环境变量） ====================
+SERIAL_PORT = os.getenv('SERIAL_PORT')       # None = 自动检测
+SERIAL_BAUD = 9600
 
-MQTT_BROKER_HOST = '127.0.0.1'
-MQTT_BROKER_PORT = 1883
-MQTT_USERNAME = ''
-MQTT_PASSWORD = ''
-MQTT_TOPIC_PREFIX = 'door'
-DEVICE_ID = '001'           # 设备编号，与 STM32 中的 DEVICE_ID 一致
+MQTT_BROKER_HOST = os.getenv('MQTT_BROKER_HOST', '127.0.0.1')
+MQTT_BROKER_PORT = int(os.getenv('MQTT_BROKER_PORT', '1883'))
+MQTT_USERNAME = os.getenv('MQTT_USERNAME', '')
+MQTT_PASSWORD = os.getenv('MQTT_PASSWORD', '')
+MQTT_TOPIC_PREFIX = os.getenv('MQTT_TOPIC_PREFIX', 'door')
+DEVICE_ID = os.getenv('DEVICE_ID', '001')
 
 # ==================== 全局变量 ====================
 ser = None
 mqtt_client = None
+serial_lock = threading.Lock()     # 保护串口读写
 running = True
 
 
@@ -46,7 +56,6 @@ def find_ch340_port():
         if 'CH340' in port.description or 'CH340' in port.hwid:
             print(f"[串口] 找到 CH340: {port.device} - {port.description}")
             return port.device
-    # 如果没找到 CH340，列出所有串口让用户选择
     if ports:
         print("[串口] 未找到 CH340，可用串口:")
         for i, port in enumerate(ports):
@@ -60,15 +69,22 @@ def find_ch340_port():
     return None
 
 
+def open_serial(port):
+    """打开串口并清空缓冲区"""
+    ser_obj = serial.Serial(port, SERIAL_BAUD, timeout=0.1)
+    ser_obj.reset_input_buffer()
+    ser_obj.reset_output_buffer()
+    return ser_obj
+
+
+# ==================== MQTT 回调 ====================
+
 def on_mqtt_connect(client, userdata, flags, rc):
-    """MQTT 连接回调"""
     if rc == 0:
         print(f"[MQTT] 已连接到 {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
-        # 订阅开门命令
         topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/command"
         client.subscribe(topic, qos=1)
         print(f"[MQTT] 已订阅: {topic}")
-        # 发送上线状态
         status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
         client.publish(status_topic, "ONLINE", qos=1)
         print(f"[MQTT] 已发送上线状态: {status_topic} -> ONLINE")
@@ -77,119 +93,81 @@ def on_mqtt_connect(client, userdata, flags, rc):
 
 
 def on_mqtt_disconnect(client, userdata, rc):
-    """MQTT 断开回调"""
     if rc != 0:
         print(f"[MQTT] 意外断开 (rc={rc})，将自动重连...")
 
 
 def on_mqtt_message(client, userdata, msg):
-    """MQTT 消息回调 - 收到开门命令"""
-    global ser
-    try:
-        payload = msg.payload.decode().strip()
-        print(f"[MQTT] 收到命令 [{msg.topic}]: {payload}")
+    """MQTT 消息回调 - 收到开门命令，转发到串口"""
+    payload = msg.payload.decode().strip()
+    print(f"[MQTT] 收到命令 [{msg.topic}]: {payload}")
 
-        if payload == "OPEN_DOOR" and ser and ser.is_open:
-            # 转发到 STM32
-            ser.write(b"OPEN_DOOR\n")
-            print(f"[串口] 已发送: OPEN_DOOR\\n")
+    if payload != "OPEN_DOOR":
+        return
 
-            # 等待 STM32 响应
-            response = wait_for_response(timeout=3)
-            if response:
-                print(f"[串口] 收到响应: {response}")
-                # 上报开门结果到 MQTT
-                status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
-                client.publish(status_topic, "OK", qos=1)
-                print(f"[MQTT] 已上报: {status_topic} -> OK")
-
-                # 记录开门日志（可以通过 MQTT 让后端记录）
-                log_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/log"
-                log_data = f'{{"action":"远程开门","status":"成功","time":"{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"}}'
-                client.publish(log_topic, log_data, qos=1)
-            else:
-                print("[串口] 等待响应超时")
-                status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
-                client.publish(status_topic, "TIMEOUT", qos=1)
-
-    except Exception as e:
-        print(f"[错误] 处理 MQTT 消息失败: {e}")
+    with serial_lock:
+        if not ser or not ser.is_open:
+            print("[串口] 未连接，无法发送命令")
+            return
+        ser.write(b"OPEN_DOOR\n")
+        print("[串口] 已发送: OPEN_DOOR\\n")
 
 
-def wait_for_response(timeout=3):
-    """等待 STM32 响应"""
-    global ser
-    start_time = time.time()
-    buffer = b""
-    while time.time() - start_time < timeout:
-        if ser and ser.in_waiting > 0:
-            data = ser.read(ser.in_waiting)
-            buffer += data
-            if b"\n" in buffer:
-                return buffer.decode().strip()
-        time.sleep(0.05)
-    return None
-
+# ==================== 串口读取 ====================
 
 def serial_reader():
     """串口读取线程 - 接收 STM32 上报的状态"""
-    global ser, mqtt_client, running
+    global ser, running
     buffer = ""
     while running:
         try:
-            if ser and ser.is_open and ser.in_waiting > 0:
-                data = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
+            with serial_lock:
+                is_open = ser and ser.is_open
+                waiting = ser.in_waiting if is_open else 0
+
+            if is_open and waiting > 0:
+                with serial_lock:
+                    data = ser.read(ser.in_waiting).decode('utf-8', errors='ignore')
                 buffer += data
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
                     if line:
                         print(f"[串口] 收到: {line}")
-                        # 处理 STM32 上报的状态
-                        handle_stm32_message(line)
+                        publish_status(line)
             else:
                 time.sleep(0.05)
         except Exception as e:
             if running:
                 print(f"[错误] 串口读取失败: {e}")
-            time.sleep(1)
+                time.sleep(1)
 
 
-def handle_stm32_message(message):
-    """处理 STM32 上报的消息"""
-    global mqtt_client
+def publish_status(message):
+    """将 STM32 消息转发到 MQTT"""
     if not mqtt_client:
         return
-
     status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
+    mqtt_client.publish(status_topic, message, qos=1)
+    print(f"[MQTT] 已上报: {status_topic} -> {message}")
 
-    # 映射 STM32 消息到 MQTT 状态
-    status_map = {
-        "OK": "OK",                    # 远程开门成功
-        "PWD_OK": "PWD_OK",           # 密码开门成功
-        "FP_OK": "FP_OK",             # 指纹开门成功
-        "CARD_OK": "CARD_OK",         # 刷卡开门成功
-        "ONLINE": "ONLINE",           # 设备上线
-    }
 
-    status = status_map.get(message, message)
-    mqtt_client.publish(status_topic, status, qos=1)
-    print(f"[MQTT] 已上报: {status_topic} -> {status}")
-
+# ==================== 心跳 ====================
 
 def send_heartbeat():
-    """心跳线程 - 定期发送设备在线状态"""
-    global mqtt_client, running
+    """心跳线程 - 每 30 秒发送 ONLINE"""
     while running:
         try:
             if mqtt_client and mqtt_client.is_connected():
                 status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
                 mqtt_client.publish(status_topic, "ONLINE", qos=1)
-            time.sleep(30)  # 每 30 秒发送一次心跳
+            time.sleep(30)
         except Exception as e:
             print(f"[错误] 心跳发送失败: {e}")
             time.sleep(5)
 
+
+# ==================== 主程序 ====================
 
 def main():
     global ser, mqtt_client, running
@@ -201,34 +179,28 @@ def main():
     print(f"MQTT Broker: {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}")
     print()
 
-    # 1. 查找串口
+    # 1. 查找并打开串口
     port = SERIAL_PORT or find_ch340_port()
     if not port:
         print("[错误] 未找到可用串口，请检查 CH340 连接")
         sys.exit(1)
 
-    # 2. 打开串口
     try:
-        ser = serial.Serial(port, SERIAL_BAUD, timeout=0.1)
+        ser = open_serial(port)
         print(f"[串口] 已打开 {port}，波特率 {SERIAL_BAUD}")
-        # 清空缓冲区
-        ser.reset_input_buffer()
-        ser.reset_output_buffer()
     except Exception as e:
         print(f"[错误] 打开串口失败: {e}")
         sys.exit(1)
 
-    # 3. 连接 MQTT
+    # 2. 连接 MQTT
     try:
         mqtt_client = mqtt.Client(client_id=f"serial-bridge-{DEVICE_ID}", clean_session=True)
         if MQTT_USERNAME:
             mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
-
         mqtt_client.on_connect = on_mqtt_connect
         mqtt_client.on_disconnect = on_mqtt_disconnect
         mqtt_client.on_message = on_mqtt_message
         mqtt_client.reconnect_delay_set(min_delay=1, max_delay=30)
-
         mqtt_client.connect(MQTT_BROKER_HOST, MQTT_BROKER_PORT, keepalive=60)
         mqtt_client.loop_start()
         print(f"[MQTT] 正在连接 {MQTT_BROKER_HOST}:{MQTT_BROKER_PORT}...")
@@ -238,13 +210,9 @@ def main():
         ser.close()
         sys.exit(1)
 
-    # 4. 启动串口读取线程
-    reader_thread = threading.Thread(target=serial_reader, daemon=True)
-    reader_thread.start()
-
-    # 5. 启动心跳线程
-    heartbeat_thread = threading.Thread(target=send_heartbeat, daemon=True)
-    heartbeat_thread.start()
+    # 3. 启动后台线程
+    threading.Thread(target=serial_reader, daemon=True).start()
+    threading.Thread(target=send_heartbeat, daemon=True).start()
 
     print()
     print("=" * 60)
@@ -254,35 +222,38 @@ def main():
     print("=" * 60)
     print()
 
-    # 6. 主循环 - 也可以从命令行手动发送命令
+    # 4. 主循环 - 手动发送命令
     try:
         while running:
             try:
                 user_input = input()
-                if user_input.strip().upper() == "OPEN_DOOR":
-                    ser.write(b"OPEN_DOOR\n")
-                    print("[串口] 已手动发送: OPEN_DOOR")
-                elif user_input.strip().upper() == "QUIT":
+                cmd = user_input.strip().upper()
+                if cmd == "QUIT":
                     break
-                elif user_input.strip():
-                    ser.write((user_input.strip() + "\n").encode())
-                    print(f"[串口] 已发送: {user_input.strip()}")
+                if not cmd:
+                    continue
+                with serial_lock:
+                    if ser and ser.is_open:
+                        ser.write((user_input.strip() + "\n").encode())
+                        print(f"[串口] 已发送: {user_input.strip()}")
+                    else:
+                        print("[串口] 未连接")
             except EOFError:
                 break
     except KeyboardInterrupt:
         pass
 
-    # 7. 清理
+    # 5. 清理
     print("\n[退出] 正在关闭...")
     running = False
     if mqtt_client:
-        # 发送离线状态
         status_topic = f"{MQTT_TOPIC_PREFIX}/{DEVICE_ID}/status"
         mqtt_client.publish(status_topic, "OFFLINE", qos=1)
         mqtt_client.loop_stop()
         mqtt_client.disconnect()
-    if ser:
-        ser.close()
+    with serial_lock:
+        if ser:
+            ser.close()
     print("[退出] 已关闭")
 
 

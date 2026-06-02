@@ -10,7 +10,15 @@
 <script setup>
 import { useRouter } from 'vue-router'
 const router = useRouter()
-const goHome = () => router.push(localStorage.getItem('token') ? '/admin/dashboard' : '/login')
+const goHome = () => {
+  if (!localStorage.getItem('token')) {
+    router.push('/login')
+    return
+  }
+  const role = localStorage.getItem('role')
+  const redirectPath = role === 'admin' ? '/admin/dashboard' : '/dashboard'
+  router.push(redirectPath)
+}
 </script>
 
 <style scoped>

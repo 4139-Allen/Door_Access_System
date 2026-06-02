@@ -43,41 +43,51 @@
         <span class="section-title">快捷操作</span>
       </template>
       <div class="quick-actions">
-        <el-button class="action-btn" @click="goRoute('/admin/door')">快速开门</el-button>
-        <el-button class="action-btn" @click="goRoute('/admin/device')">设备管理</el-button>
-        <el-button class="action-btn" @click="goRoute('/admin/log')">查看日志</el-button>
-        <el-button v-if="role === 'admin'" class="action-btn" @click="goRoute('/admin/user')">用户管理</el-button>
+        <el-button class="action-btn" @click="goRoute(routePrefix + '/door')">快速开门</el-button>
+        <el-button v-if="role === 'admin'" class="action-btn" @click="goRoute(routePrefix + '/device')">设备管理</el-button>
+        <el-button v-if="role === 'admin'" class="action-btn" @click="goRoute(routePrefix + '/log')">查看日志</el-button>
+        <el-button v-if="role === 'admin'" class="action-btn" @click="goRoute(routePrefix + '/user')">用户管理</el-button>
       </div>
     </el-card>
 
-    <!-- 最近开门记录 -->
+    <!-- 实时事件流 -->
     <el-card class="section-card" shadow="never">
       <template #header>
-        <span class="section-title">最近开门记录</span>
+        <div class="section-header">
+          <span class="section-title">实时事件流</span>
+          <el-tag v-if="eventList.length > 0" type="success" size="small" effect="plain">
+            共 {{ eventList.length }} 条
+          </el-tag>
+        </div>
       </template>
-      <el-table
-        v-loading="logsLoading"
-        :data="recentLogs"
-        stripe
-        empty-text="暂无开门记录"
-        style="width: 100%"
-      >
-        <el-table-column label="时间" prop="time" min-width="160" />
-        <el-table-column label="设备" prop="device_name" min-width="100" />
-        <el-table-column label="位置" prop="device_location" min-width="120" show-overflow-tooltip />
-        <el-table-column label="操作" prop="action" width="80" />
-        <el-table-column label="状态" prop="status" width="140">
-          <template #default="{ row }">
-            <el-tag
-              :type="row.status === '成功' ? 'success' : 'danger'"
-              effect="plain"
-              size="small"
-            >
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="event-stream" v-loading="logsLoading">
+        <TransitionGroup name="event-slide" tag="div">
+          <div
+            v-for="event in displayedEvents"
+            :key="event.id"
+            class="event-item"
+          >
+            <div class="event-dot"></div>
+            <div class="event-body">
+              <div class="event-main">
+                <span class="event-user">{{ event.username }}</span>
+                <span class="event-sep">打开了</span>
+                <span class="event-device">{{ event.device_name }}</span>
+                <span v-if="event.location" class="event-location">({{ event.location }})</span>
+              </div>
+              <div class="event-meta">
+                <el-tag size="small" :type="actionTagType(event.action)" effect="plain">
+                  {{ event.action }}
+                </el-tag>
+                <span class="event-time">{{ event.timestamp }}</span>
+              </div>
+            </div>
+          </div>
+        </TransitionGroup>
+        <div v-if="displayedEvents.length === 0 && !logsLoading" class="event-empty">
+          暂无事件
+        </div>
+      </div>
     </el-card>
 
     <!-- AI 悬浮按钮 -->
@@ -90,19 +100,41 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/utils/request'
 import StatCard from '@/components/Dashboard/StatCard.vue'
 import AiChatBox from '@/components/Dashboard/AiChatBox.vue'
+import { useDoorEventStream } from '@/composables/useDoorEventStream'
 
 const router = useRouter()
 const role = ref(localStorage.getItem('role') || '')
 const aiDialog = ref(false)
 const logsLoading = ref(false)
 
+// 根据角色生成路由前缀
+const routePrefix = computed(() => role.value === 'admin' ? '/admin' : '/user')
+
 const stat = ref({ user_total: 0, device_total: 0, today_log: 0 })
 const recentLogs = ref([])
+const { eventList, addDoorEvent } = useDoorEventStream()
+const displayedEvents = computed(() => eventList.slice(0, 20))
+
+const actionTagType = (action) => {
+  if (action.includes('密码')) return 'warning'
+  if (action.includes('指纹')) return 'success'
+  if (action.includes('刷卡')) return 'primary'
+  return 'info'
+}
+
+watch(
+  () => eventList.length,
+  (newLen, oldLen) => {
+    if (newLen > oldLen) {
+      stat.value.today_log += (newLen - oldLen)
+    }
+  }
+)
 
 const now = ref(new Date())
 let timer = null
@@ -169,7 +201,21 @@ const goRoute = (path) => {
 
 onMounted(() => {
   getStat()
-  getRecentLogs()
+  // 只在事件列表为空时加载历史数据，避免页面切换重复添加
+  if (eventList.length === 0) {
+    getRecentLogs().then(() => {
+      // API 返回倒序（最新在前），reverse 后按时间正序，再 unshift 保证最新在顶部
+      recentLogs.value.reverse().forEach(log => {
+        addDoorEvent({
+          username: log.user_id ? log.username : '本地',
+          device_name: log.device_name || '未知设备',
+          location: log.device_location || '',
+          action: log.action || '开门',
+          timestamp: log.time
+        })
+      })
+    })
+  }
   timer = setInterval(() => {
     now.value = new Date()
   }, 1000)
@@ -298,5 +344,107 @@ onUnmounted(() => {
 .section-card :deep(.el-table__empty-text) {
   color: #c0c4cc;
   font-size: 14px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.event-stream {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.event-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.event-item:last-child {
+  border-bottom: none;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+  background: #409eff;
+}
+
+.event-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.event-main {
+  font-size: 14px;
+  color: #303133;
+}
+
+.event-user {
+  font-weight: 600;
+}
+
+.event-sep {
+  color: #909399;
+  margin: 0 4px;
+}
+
+.event-device {
+  font-weight: 500;
+}
+
+.event-location {
+  color: #909399;
+}
+
+.event-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.event-time {
+  font-size: 12px;
+  color: #909399;
+  font-variant-numeric: tabular-nums;
+}
+
+.event-empty {
+  text-align: center;
+  color: #c0c4cc;
+  font-size: 14px;
+  padding: 40px 0;
+}
+
+.event-slide-enter-active {
+  transition: all 0.4s ease-out;
+}
+
+.event-slide-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.event-slide-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+.event-slide-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.event-slide-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
 }
 </style>

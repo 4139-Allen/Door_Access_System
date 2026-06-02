@@ -41,6 +41,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         app_logger.error(f"⚠️ MQTT 客户端启动失败: {e}")
 
+    # 4. 启动设备状态监控
+    try:
+        from services.device_monitor_service import start_device_monitor
+        start_device_monitor()
+    except Exception as e:
+        app_logger.error(f"⚠️ 设备状态监控启动失败: {e}")
+
     app_logger.info("=" * 50)
     app_logger.info("✅ 门禁管理系统服务启动成功 🚀")
     app_logger.info("📍 服务地址: http://127.0.0.1:8000")
@@ -60,6 +67,13 @@ async def lifespan(app: FastAPI):
         mqtt_manager.stop()
     except Exception as e:
         app_logger.error(f"MQTT 关闭失败: {e}")
+
+    # 关闭设备状态监控
+    try:
+        from services.device_monitor_service import stop_device_monitor
+        stop_device_monitor()
+    except Exception as e:
+        app_logger.error(f"设备状态监控关闭失败: {e}")
 
 
 

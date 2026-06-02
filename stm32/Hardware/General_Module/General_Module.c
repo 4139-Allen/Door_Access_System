@@ -11,6 +11,8 @@ void GeneralModule_Init(GeneralModule *Module, GPIOMode_TypeDef GPIO_Mode)
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode;
 	GPIO_Init(Module->GPIOx, &GPIO_InitStructure);
+
+	GPIO_SetBits(Module->GPIOx, Module->GPIO_Pin);
 }
 
 uint8_t GeneralModule_Read(GeneralModule *Module)

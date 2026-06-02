@@ -10,6 +10,7 @@ from database.models.user_device import UserDevice
 from utils.auth import verify_password, create_access_token, hash_password
 from typing import Optional, NamedTuple
 from utils.logger import AppLogger
+from services.stat_service import invalidate_all_stat_cache
 
 logger = AppLogger.get_logger()
 
@@ -70,6 +71,7 @@ def db_create_user(db: Session, username: str, password: str, role: str = "user"
     db.add(user)
     db.commit()
     db.refresh(user)
+    invalidate_all_stat_cache()
 
     logger.info(f"👤 创建用户成功 | 用户名: {username} | 角色: {role} | 用户ID: {user.id}")
     return user
@@ -102,6 +104,8 @@ def delete_user_by_id(db: Session, user_id: int) -> bool:
     # 删除用户（DoorLog 由数据库 ondelete=SET NULL 自动置空 user_id）
     db.delete(user)
     db.commit()
+
+    invalidate_all_stat_cache()
 
     logger.info(f"🗑️  删除用户成功 | 用户名: {username} | 用户ID: {user_id}")
     return True

@@ -11,10 +11,11 @@
           :loading="loading"
         >
           <el-option
-            v-for="d in deviceList"
+            v-for="d in liveDeviceList"
             :key="d.id"
             :label="`${d.name} | ${d.location}`"
             :value="d.id"
+            :disabled="d.status !== 'online'"
           >
             <div class="option-item">
               <span class="option-status" :class="d.status === 'online' ? 'online' : 'offline'"></span>
@@ -66,6 +67,9 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
+
+const { deviceStatusMap } = useDeviceStatus()
 
 const props = defineProps({
   deviceList: Array,
@@ -75,9 +79,16 @@ const props = defineProps({
 })
 const emit = defineEmits(['open', 'update:selectedId'])
 
+const liveDeviceList = computed(() => {
+  return (props.deviceList || []).map(d => ({
+    ...d,
+    status: deviceStatusMap[d.id]?.status || d.status
+  }))
+})
+
 const selectedDevice = computed(() => {
-  if (!props.selectedId || !props.deviceList) return null
-  return props.deviceList.find(d => d.id === props.selectedId) || null
+  if (!props.selectedId || !liveDeviceList.value) return null
+  return liveDeviceList.value.find(d => d.id === props.selectedId) || null
 })
 
 const buttonDisabled = computed(() => {

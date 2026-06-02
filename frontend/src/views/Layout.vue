@@ -55,6 +55,7 @@ import { ElMessage } from 'element-plus'
 import { ref, reactive, computed } from 'vue'
 import { Lock } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { closeWebSocket } from '@/utils/websocket'
 import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
 import ChangePasswordModal from '@/components/Layout/ChangePasswordModal.vue'
 
@@ -71,6 +72,8 @@ const pageNames = {
   '/admin/user': '用户管理',
   '/admin/device': '设备管理',
   '/admin/log': '门禁日志',
+  '/user/dashboard': '仪表盘',
+  '/user/door': '用户开门',
 }
 
 const currentPageName = computed(() => pageNames[route.path] || '')
@@ -126,6 +129,7 @@ const handleChangePassword = async () => {
 }
 
 const logout = async () => {
+  closeWebSocket()
   try {
     await request.post('/auth/logout')
   } catch {

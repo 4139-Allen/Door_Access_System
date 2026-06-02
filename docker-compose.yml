@@ -1,51 +1,82 @@
-version: '3.3'
+﻿version: '3.3'
 
 services:
   mysql:
     image: mysql:8.0
     container_name: door-mysql
-    restart: always
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 784m
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-123456}
       MYSQL_DATABASE: ${MYSQL_DB:-door_access_system}
     ports:
-      - "3307:3306"   #本机端口:容器端口(腾出3306给容器使用)
+      - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   redis:
     image: redis:6
     container_name: door-redis
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128m
     ports:
       - "6379:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   mosquitto:
     image: eclipse-mosquitto:2
     container_name: door-mqtt
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64m
     ports:
-      - "1883:1883"   # MQTT
+      - "1883:1883"
     volumes:
       - mosquitto-data:/mosquitto/data
       - mosquitto-logs:/mosquitto/log
-    environment:
-      - MOSQUITTO_CONFIG='listener 1883\nallow_anonymous true'
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
   fastapi:
     build:
       context: .
       dockerfile: Dockerfile.backend
     container_name: door-api
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256m
     ports:
       - "8000:8000"
     depends_on:
-      - mysql
-      - redis
-      - mosquitto
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
     env_file: .env
     environment:
       - MQTT_BROKER_HOST=mosquitto
@@ -53,17 +84,28 @@ services:
       - REDIS_HOST=redis
     volumes:
       - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: door-frontend
-    restart: always
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64m
     ports:
       - "80:80"
     depends_on:
-      - fastapi
+      fastapi:
+        condition: service_healthy
 
 volumes:
   mysql-data:

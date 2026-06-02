@@ -57,7 +57,7 @@
       </div>
 
       <DeviceTable
-        :device-list="deviceList"
+        :device-list="liveDeviceList"
         :total="total"
         :loading="loading"
         v-model:page="page"
@@ -96,13 +96,16 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useListFetch } from '@/composables/useListFetch'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
 import request from '@/utils/request'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import SearchFilter from '@/components/common/SearchFilter.vue'
 import AddForm from '@/components/common/AddForm.vue'
 import DeviceTable from '@/components/Device/DeviceTable.vue'
+
+const { deviceStatusMap } = useDeviceStatus()
 
 const {
   dataList: deviceList, page, size, total, loading, filterForm,
@@ -110,6 +113,13 @@ const {
 } = useListFetch('/devices', {
   defaultFilter: { name: '' },
   paramsBuilder: (f) => f.name?.trim() ? { name: f.name.trim() } : {}
+})
+
+const liveDeviceList = computed(() => {
+  return deviceList.value.map(d => ({
+    ...d,
+    status: deviceStatusMap[d.id]?.status || d.status
+  }))
 })
 
 const addForm = ref({ name: '', location: '' })

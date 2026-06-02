@@ -1,4 +1,6 @@
 import { ElMessage } from 'element-plus'
+import { useDeviceStatus } from '@/composables/useDeviceStatus'
+import { useDoorEventStream } from '@/composables/useDoorEventStream'
 
 let ws = null
 let lockReconnect = false
@@ -40,10 +42,21 @@ function createWebSocket() {
       }
 
       if (data.type === 'door_open') {
-        const role = localStorage.getItem('role')
-        if (role === 'admin') {
-          ElMessage.success(data.message)
+        const { addDoorEvent } = useDoorEventStream()
+        addDoorEvent(data)
+      }
+
+      if (data.type === 'device_status') {
+        const { updateDeviceStatus } = useDeviceStatus()
+        updateDeviceStatus(data.device_id, data.status)
+
+        // 显示设备上下线通知
+        if (data.status === 'online') {
+          ElMessage.success(`设备 [${data.device_name}] 已上线`)
+        } else if (data.status === 'offline') {
+          ElMessage.warning(`设备 [${data.device_name}] 已离线`)
         }
+        return
       }
     } catch (e) {
       console.log('消息解析失败', e)
@@ -67,15 +80,27 @@ function reconnect() {
   }
   lockReconnect = true
   retryCount++
-  console.log(`WebSocket 重连中 (${retryCount}/${MAX_RETRY})...`)
+  // 指数退避: 1s, 2s, 4s, 8s... 最大 30s
+  const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 30000)
+  console.log(`WebSocket 重连中 (${retryCount}/${MAX_RETRY})，${delay}ms 后重试...`)
   setTimeout(() => {
     createWebSocket()
     lockReconnect = false
-  }, 2000)
+  }, delay)
 }
 
 export function initWebSocket() {
   createWebSocket()
 }
 
-export default { initWebSocket }
+export function closeWebSocket() {
+  if (ws) {
+    ws.close()
+    ws = null
+    authFailed = true  // 阻止自动重连
+    lockReconnect = false
+    retryCount = 0
+  }
+}
+
+export default { initWebSocket, closeWebSocket }

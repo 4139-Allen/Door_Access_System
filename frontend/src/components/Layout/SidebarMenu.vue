@@ -20,26 +20,26 @@
     >
       <div class="menu-label">导航</div>
 
-      <el-menu-item index="/admin/dashboard">
+      <el-menu-item :index="routePrefix + '/dashboard'">
         <span>首页</span>
       </el-menu-item>
 
-      <el-menu-item index="/admin/door">
+      <el-menu-item :index="routePrefix + '/door'">
         <span>用户开门</span>
       </el-menu-item>
 
       <template v-if="role === 'admin'">
         <div class="menu-label">管理</div>
 
-        <el-menu-item index="/admin/user">
+        <el-menu-item :index="routePrefix + '/user'">
           <span>用户管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/admin/device">
+        <el-menu-item :index="routePrefix + '/device'">
           <span>设备管理</span>
         </el-menu-item>
 
-        <el-menu-item index="/admin/log">
+        <el-menu-item :index="routePrefix + '/log'">
           <span>门禁日志</span>
         </el-menu-item>
       </template>
@@ -48,9 +48,9 @@
     <!-- 底部 -->
     <div class="sidebar-footer">
       <div class="user-info">
-        <div class="user-avatar">{{ role === 'admin' ? 'A' : 'U' }}</div>
+        <div class="user-avatar">{{ username.charAt(0).toUpperCase() }}</div>
         <div class="user-meta">
-          <span class="user-name">{{ role === 'admin' ? '管理员' : '普通用户' }}</span>
+          <span class="user-name">{{ username }}</span>
           <span class="user-role">{{ role === 'admin' ? 'Admin' : 'User' }}</span>
         </div>
       </div>
@@ -64,6 +64,12 @@ import { useRoute } from 'vue-router'
 
 defineProps({ role: String })
 const route = useRoute()
+const username = computed(() => localStorage.getItem('username') || '用户')
+// 根据角色生成正确的路由前缀
+const routePrefix = computed(() => {
+  const role = localStorage.getItem('role')
+  return role === 'admin' ? '/admin' : '/user'
+})
 const activeRoute = computed(() => route.path)
 </script>
 

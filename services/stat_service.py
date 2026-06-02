@@ -4,8 +4,26 @@ from database.models.device import Device
 from database.models.door_log import DoorLog
 from database.models.user_device import UserDevice
 from datetime import datetime, date
-from utils.service_exception import handle_query_exception
+from utils.service_exception import service_exception_handler, handle_query_exception
 from typing import TypedDict
+from database.redis import redis_client
+STAT_CACHE_KEY_TEMPLATE = "stat:user:{user_id}"
+
+
+@service_exception_handler
+def invalidate_stat_cache(user_id: int):
+    if redis_client:
+        redis_client.delete(STAT_CACHE_KEY_TEMPLATE.format(user_id=user_id))
+
+
+@service_exception_handler
+def invalidate_all_stat_cache():
+    if redis_client:
+        keys = list(redis_client.scan_iter("stat:user:*"))
+        if keys:
+            redis_client.delete(*keys)
+
+
 
 
 class StatisticsResult(TypedDict):

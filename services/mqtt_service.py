@@ -18,6 +18,7 @@ from database.db import SessionLocal
 from database.models.device import Device
 from database.models.door_log import DoorLog
 from services.websocket_service import manager as ws_manager
+from services.device_monitor_service import mark_device_online, is_device_known_online
 from utils.service_exception import service_exception_handler
 from utils.logger import AppLogger
 
@@ -39,14 +40,7 @@ def _save_local_door_log(db: Session, device_id: str, action: str):
     ))
     db.commit()
     logger.info(f"本地开门记录 [{device_id}]: {action}")
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(
-                ws_manager.send_to_admin("本地", device.name, device.location or "")
-            )
-    except RuntimeError:
-        pass
+    mqtt_manager._schedule_send_door_event(device.id, "本地", device.name, device.location or "", action)
 
 
 class MQTTManager:
@@ -55,9 +49,12 @@ class MQTTManager:
     def __init__(self):
         self.client: Optional[mqtt.Client] = None
         self.connected = False
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
 
     def start(self):
         """初始化并连接 MQTT Broker"""
+        # 在启动时获取事件循环引用（主线程运行的循环）
+        self._loop = asyncio.get_event_loop()
         try:
             self.client = mqtt.Client(client_id="door-backend", clean_session=True)
             if MQTT_USERNAME:
@@ -107,6 +104,26 @@ class MQTTManager:
         if redis_client and payload in ("ONLINE", "OK", "OPENED"):
             redis_client.setex(f"device:online:{device_id}", 70, "online")
 
+            # 检查是否首次上线（不在已知在线列表中），避免心跳重复推送
+            is_first_online = not is_device_known_online(device_id)
+
+            # 推送设备在线状态到前端 + 注册到监控
+            db = SessionLocal()
+            try:
+                device = db.query(Device).filter(Device.name == device_id).first()
+                if device:
+                    mark_device_online(device.id, device_id)
+                    # 只有首次上线才推送 WebSocket 通知
+                    if is_first_online:
+                        self._schedule_send_device_status(
+                            device_id=device.id,
+                            device_name=device.name,
+                            status="online",
+                            location=device.location or ""
+                        )
+            finally:
+                db.close()
+
         # 记录本地开门日志
         action_map = {"PWD_OK": "密码开门", "FP_OK": "指纹开门", "CARD_OK": "刷卡开门"}
         if payload in action_map:
@@ -136,6 +153,22 @@ class MQTTManager:
         else:
             logger.error(f"MQTT 命令发送失败 [{topic}], rc={result.rc}")
             return False
+
+    def _schedule_coroutine(self, coro, error_msg: str = "调度异步任务失败"):
+        """统一调度异步协程（线程安全）"""
+        if not self._loop or not self._loop.is_running():
+            logger.warning(f"事件循环未运行，无法{error_msg}")
+            return
+        try:
+            asyncio.run_coroutine_threadsafe(coro, self._loop)
+        except Exception as e:
+            logger.warning(f"{error_msg}: {e}")
+
+    def _schedule_send_device_status(self, **kwargs):
+        self._schedule_coroutine(ws_manager.send_device_status(**kwargs), "发送设备状态消息")
+
+    def _schedule_send_door_event(self, device_id: int, username: str, device_name: str, location: str, action: str):
+        self._schedule_coroutine(ws_manager.send_door_event(device_id, username, device_name, location, action), "发送开门事件")
 
     def stop(self):
         """断开 MQTT 连接"""

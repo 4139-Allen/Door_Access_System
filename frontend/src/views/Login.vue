@@ -40,7 +40,6 @@
                   autocomplete="current-password"
                   @focus="focusedField = 'login-pass'"
                   @blur="focusedField = ''"
-                  @keyup.enter="handleLogin"
                 />
                 <el-button text class="pwd-toggle" @click="loginPwdVisible = !loginPwdVisible">
                   <el-icon><View v-if="loginPwdVisible" /><Hide v-else /></el-icon>
@@ -135,6 +134,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, View, Hide } from '@element-plus/icons-vue'
 import request from '@/utils/request'
+import { initWebSocket } from '@/utils/websocket'
 
 const router = useRouter()
 const activeTab = ref('login')
@@ -184,8 +184,12 @@ const handleLogin = async () => {
     if (res.code === 200) {
       localStorage.setItem('token', res.data.token)
       localStorage.setItem('role', res.data.role)
+      localStorage.setItem('username', res.data.username || form.value.username)
+      initWebSocket()
       ElMessage.success('登录成功')
-      router.push('/admin/dashboard')
+      // 根据角色跳转到不同页面
+      const redirectPath = res.data.role === 'admin' ? '/admin/dashboard' : '/user/dashboard'
+      router.push(redirectPath)
     } else {
       ElMessage.error(res.msg || '登录失败')
     }
