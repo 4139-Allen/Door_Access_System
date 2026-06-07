@@ -1,6 +1,6 @@
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -13,7 +13,7 @@ from database.redis import redis_client
 from database.db import get_db
 from database.models.user import User
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # ====================== 创建 token（存入 Redis）======================
@@ -50,9 +50,18 @@ def create_access_token(data: dict) -> str:
 
 # ====================== 校验用户（先查 Redis + 黑名单）======================
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> int:
-    token = credentials.credentials
+    # 支持两种 token 传递方式：Authorization header（Web端）和 X-Token header（小程序端）
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    else:
+        token = request.headers.get("X-Token")
+
+    if not token:
+        raise HTTPException(status_code=401, detail="未提供认证凭证")
 
     # ====================== 解码 JWT，自动校验过期======================
     try:

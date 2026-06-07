@@ -10,4 +10,5 @@ class User(Base):
     username = Column(String(50), unique=True, index=True)
     password = Column(String(100))
     role = Column(String(20), default="user")
+    openid = Column(String(100), unique=True, nullable=True, index=True)
     created_at = Column(DateTime, default=datetime.now)

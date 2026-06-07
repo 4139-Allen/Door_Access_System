@@ -31,11 +31,17 @@ else
     echo ".env 文件已存在，跳过"
 fi
 
-# 3. 创建日志目录
+# 3. 创建日志目录和 MQTT 配置文件
 echo ""
-echo "[3/5] 创建日志目录..."
+echo "[3/5] 创建必要文件和目录..."
 mkdir -p logs
-echo "logs 目录已就绪"
+
+# 创建 Mosquitto 配置文件
+cat > mosquitto.conf << 'EOF'
+listener 1883
+allow_anonymous true
+EOF
+echo "logs 目录和 mosquitto.conf 已就绪"
 
 # 4. 停止旧容器
 echo ""

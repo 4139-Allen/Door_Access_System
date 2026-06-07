@@ -9,6 +9,7 @@ from api.device_api import router as device_router
 from api.stat_api import router as stat_router
 from api.ai_agent import router as ai_router
 from api.websocket_api import router as websocket_router
+from api.wx_auth_api import router as wx_auth_router
 
 # 3. 创建总路由
 routers = APIRouter()
@@ -21,5 +22,6 @@ routers.include_router(device_router)       # 设备管理
 routers.include_router(stat_router)         # 统计数据
 routers.include_router(ai_router)           # AI智能助手
 routers.include_router(websocket_router)    # WebSocket
+routers.include_router(wx_auth_router)      # 微信小程序认证
 
 

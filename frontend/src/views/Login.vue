@@ -235,6 +235,7 @@ const handleRegister = async () => {
 /* ======== 登录卡片 ======== */
 .login-card {
   width: 400px;
+  max-width: calc(100vw - 32px);
   padding: 40px 36px 24px;
   background: #fff;
   border-radius: 12px;

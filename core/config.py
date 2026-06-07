@@ -84,6 +84,13 @@ MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 MQTT_TOPIC_PREFIX = os.getenv("MQTT_TOPIC_PREFIX", "door")
 
+# ==================== 微信小程序配置 ====================
+WX_APPID = os.getenv("WX_APPID", "")
+WX_SECRET = os.getenv("WX_SECRET", "")
+
+if not WX_APPID or not WX_SECRET:
+    logging.warning("⚠️  未配置 WX_APPID / WX_SECRET，微信小程序登录功能将不可用")
+
 # ==================== CORS 配置 ====================
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
 

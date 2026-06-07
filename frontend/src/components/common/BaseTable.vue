@@ -61,8 +61,20 @@ const emit = defineEmits(['update:page', 'update:size'])
 }
 .pagination-wrap {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   padding: 16px 24px;
   border-top: 1px solid #f1f5f9;
+}
+
+@media (max-width: 600px) {
+  .pagination-wrap {
+    padding: 12px 8px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .pagination-wrap :deep(.el-pagination) {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 </style>

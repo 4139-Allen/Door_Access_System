@@ -11,6 +11,17 @@ ENV/
 
 # 环境变量文件（包含敏感信息）
 .env
+.env.*
+
+# SSL 证书和私钥（绝对不能提交）
+SSL/
+*.pem
+*.key
+*.cer
+*.crt
+*.p12
+*.pfx
+*.jks
 
 # IDE
 .idea/

@@ -38,8 +38,17 @@ def register_new_user(data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/auth/logout", summary="退出登录", response_model=ApiResponse)
 @handle_api_exception
-def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    token = credentials.credentials
+def logout(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    # 支持两种 token 传递方式
+    token = None
+    if credentials and credentials.credentials:
+        token = credentials.credentials
+    else:
+        token = request.headers.get("X-Token")
+
+    if not token:
+        return error("未提供认证凭证", code=401)
+
     logout_token(token)
     return success(msg="退出成功，Token 已失效")
 

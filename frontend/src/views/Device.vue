@@ -68,7 +68,7 @@
     </div>
 
     <!-- 编辑弹窗 -->
-    <el-dialog v-model="editDialogVisible" title="编辑设备" width="450px" top="30vh">
+    <el-dialog v-model="editDialogVisible" title="编辑设备" width="min(450px, 90vw)" top="30vh">
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="80px">
         <el-form-item label="设备名称" prop="name">
           <el-input v-model="editForm.name" placeholder="输入设备名称" />
@@ -218,13 +218,5 @@ const delDevice = async (id) => {
 <style scoped>
 .device-page {
   padding: 4px;
-}
-
-@media (max-width: 900px) {
-  .page-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
 }
 </style>

@@ -447,4 +447,21 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateX(30px);
 }
+
+@media (max-width: 600px) {
+  .welcome-banner :deep(.el-card__body) {
+    padding: 16px;
+  }
+  .greeting-text {
+    font-size: 17px;
+  }
+  .time-text {
+    font-size: 22px;
+    letter-spacing: 1px;
+  }
+  .ai-fab-wrap {
+    right: 16px;
+    bottom: 16px;
+  }
+}
 </style>

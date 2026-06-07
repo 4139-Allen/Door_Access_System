@@ -82,7 +82,7 @@
     </div>
 
     <!-- 绑定设备弹窗 -->
-    <el-dialog v-model="deviceDialogVisible" width="420px" top="30vh">
+    <el-dialog v-model="deviceDialogVisible" width="min(420px, 90vw)" top="30vh">
       <template #header>
         <span>绑定设备</span>
       </template>

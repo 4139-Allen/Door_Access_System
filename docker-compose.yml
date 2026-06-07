@@ -1,4 +1,4 @@
-﻿version: '3.3'
+version: '3.3'
 
 services:
   mysql:
@@ -103,6 +103,10 @@ services:
           memory: 64m
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./SSL/doorlink.top.pem:/etc/nginx/ssl/doorlink.top.pem:ro
+      - ./SSL/doorlink.top.key:/etc/nginx/ssl/doorlink.top.key:ro
     depends_on:
       fastapi:
         condition: service_healthy

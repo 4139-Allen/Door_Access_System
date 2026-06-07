@@ -1,12 +1,26 @@
 <template>
   <el-container class="layout-container">
-    <!-- 侧边栏 -->
-    <SidebarMenu :role="role" />
+    <!-- 桌面端侧边栏 -->
+    <SidebarMenu :role="role" class="desktop-sidebar" @change-password="showPasswordDialog = true" @logout="logout" />
+
+    <!-- 移动端侧边栏 Overlay -->
+    <Teleport to="body">
+      <Transition name="sidebar-fade">
+        <div v-if="sidebarOpen" class="mobile-sidebar-overlay" @click="sidebarOpen = false">
+          <div class="mobile-sidebar-panel" @click.stop>
+            <SidebarMenu :role="role" @navigate="sidebarOpen = false" @change-password="showPasswordDialog = true; sidebarOpen = false" @logout="logout" />
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <el-container class="main-container">
       <!-- 顶部栏 -->
       <el-header class="app-header">
         <div class="header-left">
+          <el-button text class="hamburger-btn" @click="sidebarOpen = true">
+            <el-icon :size="20"><Fold /></el-icon>
+          </el-button>
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item>{{ currentPageName }}</el-breadcrumb-item>
@@ -14,15 +28,6 @@
         </div>
 
         <div class="header-right">
-          <el-button text class="header-btn" @click="showPasswordDialog = true">
-            <el-icon style="font-size:16px"><Lock /></el-icon>
-            <span>修改密码</span>
-          </el-button>
-          <div class="header-divider"></div>
-          <el-button text class="header-btn logout-btn" @click="logout">
-            <span class="logout-icon">⇠</span>
-            <span>退出登录</span>
-          </el-button>
         </div>
       </el-header>
 
@@ -52,8 +57,8 @@
 <script setup>
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ref, reactive, computed } from 'vue'
-import { Lock } from '@element-plus/icons-vue'
+import { ref, reactive, computed, watch } from 'vue'
+import { Fold } from '@element-plus/icons-vue'
 import request from '@/utils/request'
 import { closeWebSocket } from '@/utils/websocket'
 import SidebarMenu from '@/components/Layout/SidebarMenu.vue'
@@ -65,6 +70,10 @@ const role = ref(localStorage.getItem('role') || '')
 const showPasswordDialog = ref(false)
 const changing = ref(false)
 const passwordModal = ref(null)
+const sidebarOpen = ref(false)
+
+// 路由变化时关闭移动端侧边栏
+watch(() => route.path, () => { sidebarOpen.value = false })
 
 const pageNames = {
   '/admin/dashboard': '仪表盘',
@@ -197,39 +206,6 @@ const logout = async () => {
   gap: 4px;
 }
 
-.header-btn {
-  height: 34px;
-  padding: 0 14px;
-  border-radius: 8px;
-  color: #64748b;
-  font-size: 13px;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.header-btn:hover {
-  background: #f1f5f9;
-  color: #1e293b;
-}
-
-.logout-btn:hover {
-  color: #ef4444;
-  background: #fef2f2;
-}
-
-.header-divider {
-  width: 1px;
-  height: 20px;
-  background: #e2e8f0;
-  margin: 0 6px;
-}
-
-.logout-icon {
-  font-size: 14px;
-}
-
 /* ======== 主内容 ======== */
 .app-main {
   background: #f1f5f9;
@@ -241,7 +217,7 @@ const logout = async () => {
 /* ======== 页面过渡动画 ======== */
 .fade-slide-enter-active,
 .fade-slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .fade-slide-enter-from {
@@ -252,5 +228,65 @@ const logout = async () => {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-12px);
+}
+
+/* ======== 移动端适配 ======== */
+.hamburger-btn {
+  display: none;
+  padding: 6px;
+  margin-right: 8px;
+}
+
+/* 移动端侧边栏 Overlay */
+.mobile-sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.mobile-sidebar-panel {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 220px;
+  height: 100%;
+}
+
+/* Overlay 动画 */
+.sidebar-fade-enter-active,
+.sidebar-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.sidebar-fade-enter-active .mobile-sidebar-panel,
+.sidebar-fade-leave-active .mobile-sidebar-panel {
+  transition: transform 0.25s ease;
+}
+.sidebar-fade-enter-from,
+.sidebar-fade-leave-to {
+  opacity: 0;
+}
+.sidebar-fade-enter-from .mobile-sidebar-panel,
+.sidebar-fade-leave-to .mobile-sidebar-panel {
+  transform: translateX(-100%);
+}
+
+@media (max-width: 768px) {
+  .desktop-sidebar {
+    display: none;
+  }
+  .mobile-sidebar-overlay {
+    display: flex;
+  }
+  .hamburger-btn {
+    display: flex;
+  }
+  .app-header {
+    padding: 0 16px !important;
+  }
+  .app-main {
+    padding: 12px;
+  }
 }
 </style>

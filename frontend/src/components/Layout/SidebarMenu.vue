@@ -2,7 +2,9 @@
   <el-aside width="220px" class="sidebar-container">
     <!-- Logo -->
     <div class="sidebar-header">
-      <div class="logo-mark">D</div>
+      <div class="logo-mark">
+        <el-icon :size="18"><Lock /></el-icon>
+      </div>
       <div class="logo-text">
         <span class="logo-title">智能门禁</span>
         <span class="logo-sub">管理控制系统</span>
@@ -17,6 +19,7 @@
       active-text-color="#fff"
       router
       class="sidebar-menu"
+      @select="emit('navigate')"
     >
       <div class="menu-label">导航</div>
 
@@ -54,6 +57,16 @@
           <span class="user-role">{{ role === 'admin' ? 'Admin' : 'User' }}</span>
         </div>
       </div>
+      <div class="sidebar-actions">
+        <button class="sidebar-action-btn" @click="emit('change-password')">
+          <el-icon :size="14"><Lock /></el-icon>
+          <span>修改密码</span>
+        </button>
+        <button class="sidebar-action-btn danger" @click="emit('logout')">
+          <span class="logout-icon">⇠</span>
+          <span>退出登录</span>
+        </button>
+      </div>
     </div>
   </el-aside>
 </template>
@@ -61,8 +74,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { Lock } from '@element-plus/icons-vue'
 
 defineProps({ role: String })
+const emit = defineEmits(['navigate', 'change-password', 'logout'])
 const route = useRoute()
 const username = computed(() => localStorage.getItem('username') || '用户')
 // 根据角色生成正确的路由前缀
@@ -219,5 +234,46 @@ const activeRoute = computed(() => route.path)
 .sidebar-menu::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 2px;
+}
+
+/* ======== 操作按钮 ======== */
+.sidebar-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sidebar-action-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-action-btn.danger:hover {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.logout-icon {
+  font-size: 13px;
 }
 </style>
